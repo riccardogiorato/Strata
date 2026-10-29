@@ -666,6 +666,18 @@ int main() {
         check(session_save_checkpoints(chain, live, agree, out, why) && out.size() == 1 &&
               same_checkpoint(out[0], chain[1]), "save: admitted, the deepest checkpoint is copied");
         check(session_save_checkpoints({}, live, agree, out, why) && out.empty(), "save: no checkpoints, none copied");
+        uint64_t all_need = session_save_peak_bytes(nullptr, live);
+        for (const auto& c : chain) all_need += 2 * c.bytes();
+        check(!session_save_checkpoints(chain, live, refuse, out, why, true) && out.empty() && asked == all_need,
+              "save all: preflight includes every checkpoint before copying");
+        check(session_save_checkpoints(chain, live, agree, out, why, true) && out.size() == chain.size(),
+              "save all: retains entire checkpoint chain");
+        bool all_same = out.size() == chain.size();
+        for (size_t i = 0; all_same && i < chain.size(); ++i) all_same = same_checkpoint(out[i], chain[i]);
+        check(all_same, "save all: exact recurrent state and prefix preserved");
+        check(!session_save_checkpoints(chain, huge, refuse, out, why, true) && asked == UINT64_MAX,
+              "save all: memory accounting saturates");
+
 #if defined(__linux__) && !defined(__SANITIZE_ADDRESS__) && !defined(STRATA_NO_RLIMIT_TEST)
         // under a real address-space limit that cannot hold one more copy: the refusal comes first, no bad_alloc;
         // and the same limit with an admitting preflight does fail at the copy (the test can see the difference)
