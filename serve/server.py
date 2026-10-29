@@ -991,6 +991,8 @@ class StrataEngine:
     def __init__(self, exe: str, args: list[str], cwd: str | None = None, log: str | None = None,
                  env: dict | None = None, lazy: bool = False, cpus: list[int] | None = None, _attempt: int = 0):
         self.spawn = (exe, list(args), cwd, log, env, False, cpus)   # to start it again after it died (issue #27)
+        self._prefix_pages=None
+        self._prefix_pages_initialized=False
         self.session_save_reclaim = '--session-save-reclaim' in args
         paths = {k: v for k, v in zip(args, args[1:]) if k in ("--native", "--pack")}
         self.model_path = paths.get("--native") or paths.get("--pack", "pack/full")
@@ -2228,7 +2230,38 @@ class StrataEngine:
                          "tok_s": round(r["generated"] / max(1e-6, now - ft), 1) if ft else None})
         return view
 
+    def prefix_match(self, ids, cvec=True):
+        self.proc.stdin.write(f"CACHEMATCH {int(cvec)} {','.join(str(int(t)) for t in ids)}\n")
+        self.proc.stdin.flush()
+        try: line=self.lines.get(timeout=max(30.0,float(self.silence_s or 0)))
+        except queue.Empty: raise self._silent("persistent-cache RAM query timed out") from None
+        fields=line.split() if isinstance(line,str) else []
+        if len(fields)!=2 or fields[0]!="CACHEMATCH" or not fields[1].isdigit() or int(fields[1])>=len(ids):
+            raise self._silent("unexpected persistent-cache RAM query response")
+        return int(fields[1])
+
     def generate(self, ids, max_new, sampling, cancel, embeddings=None, prefill_only=False):
+        from serve.prefix_pages import PrefixPages
+        cache=getattr(self,"_prefix_pages",None)
+        if not getattr(self,"_prefix_pages_initialized",False):
+            self._prefix_pages=cache=PrefixPages.from_engine(self)
+            self._prefix_pages_initialized=True
+        if cache is None or embeddings is not None or prefill_only or getattr(self,"batch",0):
+            yield from self._generate_uncached(ids,max_new,sampling,cancel,embeddings,prefill_only)
+            return
+        loaded=str((getattr(self,"info",{}) or {}).get("cvec",0)) not in ("0","","None")
+        cvec=(sampling or {}).get("experimental_speed_projection") is not False if loaded else True
+        cache.before(ids,cvec,self)
+        previous=self.last
+        try:
+            yield from self._generate_uncached(ids,max_new,sampling,cancel,embeddings,prefill_only)
+        finally:
+            # The HTTP parser often closes the generator on EOS before it reads DONE. The inner generator's
+            # finally drains that exact request first; only a newly completed, healthy native state is persisted.
+            if self.last is not previous and not cancel.is_set() and self.alive() and self.last.get("finish")!="nonfinite" and (sampling or {}).get("strata_checkpoint") is not False:
+                cache.after(ids,cvec,self)
+
+    def _generate_uncached(self, ids, max_new, sampling, cancel, embeddings=None, prefill_only=False):
         """Yields token ids, and None as a heartbeat every 10 s while the engine is quiet (reading a long prompt):
         the HTTP layer turns it into an SSE comment, which keeps clients' watchdogs calm and notices a client that
         has gone.  A consumer that stops early (or `cancel`) makes the engine STOP, so it does not run to max_new."""
@@ -2533,6 +2566,9 @@ class StrataEngine:
         """End the engine process: STOP + QUIT first (the engine frees its memory itself - unpinning tens of GB can take
         a while; ENGINE_QUIT_WAIT_S), then terminate (ENGINE_TERM_WAIT_S), then kill (ENGINE_KILL_WAIT_S).  Raises
         EngineStuck when it still runs after all three."""
+        cache=getattr(self,"_prefix_pages",None)
+        if cache is not None:
+            cache.close();self._prefix_pages=None;self._prefix_pages_initialized=False
         if self.proc is None:
             return
         try:

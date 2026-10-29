@@ -1,4 +1,5 @@
 #include "strata/core/conversation_file.hpp"
+#include "strata/core/session_pages.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -527,13 +528,15 @@ bool free_space(const std::string& path, uint64_t& out) {
 
 class FileSink {
 public:
-    explicit FileSink(RawFile& f) : buf_(aligned_block()), f_(f) {}
+    explicit FileSink(RawFile& f) : buf_(aligned_block()), f_(&f) {}
+    explicit FileSink(session_pages::Writer& p) : buf_(aligned_block()), pages_(&p) {}
+    bool boundary() { if(!pages_)return true; if(used_ && !drain())return false; pages_->boundary();return true; }
     bool ok() const { return buf_ != nullptr; }
     std::string error() const {
         if (!buf_) return "out of memory for the write buffer";
-        return fault_ ? fault_msg_ : f_.error();
+        return fault_ ? fault_msg_ : (f_ ? f_->error() : "paged write failed");
     }
-    SessionError kind() const { return buf_ ? (fault_ ? fault_kind_ : f_.kind()) : SessionError::memory; }
+    SessionError kind() const { return buf_ ? (fault_ ? fault_kind_ : (f_ ? f_->kind() : SessionError::io)) : SessionError::memory; }
     // room in the block for in-place production (avoids a staging copy)
     uint8_t* span(size_t& room) { room = kBlock - used_; return buf_.get() + used_; }
     bool commit(size_t n) { used_ += n; total_ += n; return used_ < kBlock || drain(); }
@@ -551,17 +554,18 @@ public:
     }
     // last block padded to the alignment for direct I/O, then the file cut back to its exact size and flushed
     bool finish(bool durable) {
-        if (!f_.is_open()) return false;
-        if (fault_) { f_.close(); return false; }
-        const size_t padded = f_.direct() ? (used_ + kAlign - 1) / kAlign * kAlign : used_;
+        if(pages_) { if(used_ && !drain())return false;pages_->finish();return true; }
+        if (!f_->is_open()) return false;
+        if (fault_) { f_->close(); return false; }
+        const size_t padded = f_->direct() ? (used_ + kAlign - 1) / kAlign * kAlign : used_;
         std::memset(buf_.get() + used_, 0, padded - used_);
-        bool ok = f_.write_all(buf_.get(), padded);
+        bool ok = f_->write_all(buf_.get(), padded);
         if (ok && used_ && progress) (*progress)(total_, expected);   // the last, partial block
-        ok = ok && (padded == used_ || f_.truncate(total_));
+        ok = ok && (padded == used_ || f_->truncate(total_));
         if (ok && durable && phase) phase("flush", total_);
         if (ok && durable && flush_fault) { fail_with(flush_fault); ok = false; }
-        ok = ok && (!durable || f_.sync());
-        ok = f_.close() && ok;
+        ok = ok && (!durable || f_->sync());
+        ok = f_->close() && ok;
         return ok;
     }
     std::optional<Ticker> progress;
@@ -572,13 +576,15 @@ private:
     void fail_with(int e) { fault_ = true; fault_kind_ = errno_kind(e); fault_msg_ = std::strerror(e); }
     bool drain() {
         if (write_fault) { fail_with(write_fault); return false; }
-        if (!f_.write_all(buf_.get(), used_)) return false;
+        if(pages_)pages_->append(buf_.get(),used_);
+        else if (!f_->write_all(buf_.get(), used_)) return false;
         used_ = 0;
         if (progress) (*progress)(total_, expected);
         return true;
     }
     Aligned buf_;
-    RawFile& f_;
+    RawFile* f_ = nullptr;
+    session_pages::Writer* pages_ = nullptr;
     bool fault_ = false;
     SessionError fault_kind_ = SessionError::io;
     std::string fault_msg_;
@@ -588,10 +594,11 @@ private:
 
 class FileSource {
 public:
-    explicit FileSource(RawFile& f) : buf_(aligned_block()), f_(f) {}
+    explicit FileSource(RawFile& f) : buf_(aligned_block()), f_(&f) {}
+    explicit FileSource(session_pages::Reader& p) : buf_(aligned_block()), pages_(&p) {}
     bool ok() const { return buf_ != nullptr; }
-    std::string error() const { return buf_ ? f_.error() : std::string("out of memory for the read buffer"); }
-    SessionError kind() const { return buf_ ? f_.kind() : SessionError::memory; }
+    std::string error() const { return buf_ ? (f_ ? f_->error() : "paged read failed") : std::string("out of memory for the read buffer"); }
+    SessionError kind() const { return buf_ ? (f_ ? f_->kind() : SessionError::io) : SessionError::memory; }
     bool read(void* p, size_t n) {
         uint8_t* d = static_cast<uint8_t*>(p);
         while (n) {
@@ -608,11 +615,11 @@ private:
     bool fill() {
         at_ = have_ = 0;
         while (have_ < kBlock) {
-            const long long r = f_.read_some(buf_.get() + have_, kBlock - have_);
+            const long long r = pages_ ? pages_->read_some(buf_.get() + have_, kBlock - have_) : f_->read_some(buf_.get() + have_, kBlock - have_);
             if (r < 0) return false;
             if (r == 0) break;
             have_ += (size_t) r;
-            if (f_.direct() && have_ % kAlign) break;   // short aligned read: end of file
+            if (f_ && f_->direct() && have_ % kAlign) break;   // short aligned read: end of file
         }
         const uint64_t before = total_;
         total_ += have_;
@@ -620,7 +627,8 @@ private:
         return have_ > 0;
     }
     Aligned buf_;
-    RawFile& f_;
+    RawFile* f_ = nullptr;
+    session_pages::Reader* pages_ = nullptr;
     size_t at_ = 0, have_ = 0;
     uint64_t total_ = 0;
 };
@@ -643,16 +651,21 @@ struct Out {
     }
     void u64(uint64_t v) { raw(&v, 8); }
     void i64(int64_t v) { raw(&v, 8); }
-    template<class T> void vec(const std::vector<T>& v) { u64(v.size()); raw(v.data(), v.size() * sizeof(T)); }
+    template<class T> void vec(const std::vector<T>& v) {
+        u64(v.size()); if(f && ok)ok=f->boundary(); raw(v.data(), v.size()*sizeof(T));if(f && ok)ok=f->boundary();
+    }
     void buffer(const ConversationBuffer& b) {
         u64(b.size());
+        if(f && ok)ok=f->boundary();
         b.visit(0, b.size(), [&](const uint8_t* p, size_t c, size_t) { raw(p, c); return ok; });
+        if(f && ok)ok=f->boundary();
     }
     // a K/V part pulled from its owner straight into the file block (sizing pass: counted, never read)
     void source(const SessionKvSource& s, size_t part) {
         const size_t size = s.sizes[part];
         u64(size);
         if (!f) { count(size); return; }
+        if(ok)ok=f->boundary();
         for (size_t at = 0; at < size && ok;) {
             size_t room = 0;
             uint8_t* d = f->span(room);
@@ -668,6 +681,7 @@ struct Out {
             ok = ok && f->commit(c);
             at += c;
         }
+        if(ok)ok=f->boundary();
     }
     bool read_failed = false;
     std::string read_error;
@@ -1051,6 +1065,23 @@ bool write_impl(const std::string& path, const SavedConversation& image, const s
             return false;
         }
     }
+    if(opt.paged) {
+        session_pages::Writer pages(path,image,opt,&st);
+        FileSink f(pages);
+        if(!f.ok()) {st.error=SessionError::memory;error="paged session: write buffer allocation";return false;}
+        if(opt.progress)f.progress.emplace(opt.progress);
+        f.expected=total;
+        if(f.progress)(*f.progress)(0,total);
+        uint8_t h[kHeader];header_bytes(h,id,payload);
+        bool ok=f.write(h,kHeader);SessionHasher hash(0);Out out;out.f=&f;out.hash=&hash;
+        if(ok)put_payload(out,image,sources);
+        ok=ok && out.ok && out.n==payload;
+        if(ok) {auto ph=hash.digest();ok=f.write(&ph,8) && f.write(kEnd,8);}
+        if(!ok) {error="paged session: source/serialization failure " + out.read_error;return false;}
+        if(opt.phase)opt.phase("publish",total);
+        if(!f.finish(opt.durable)){error=f.error();return false;}
+        bytes=size_t(total);st.error=SessionError::none;st.published=true;return true;
+    }
     Publisher pub;
     if (!pub.open(path, error)) { st.error = pub.kind(); return false; }
     RawFile raw;
@@ -1111,6 +1142,10 @@ bool write_guarded(const std::string& path, const SavedConversation& image, cons
         error = "session file: out of memory while writing " + path;
         st.error = SessionError::memory;
         ok = false;
+    } catch (const session_pages::Failure& e) {
+        error=e.what();st.error=e.kind;ok=false;
+    } catch (const std::exception& e) {
+        error=e.what();st.error=SessionError::io;ok=false;
     }
     if (status) *status = st;
     return ok;
@@ -1183,8 +1218,10 @@ bool read_impl(const std::string& path, const SessionFileIdentity& id, SavedConv
     st = {};
     st.error = SessionError::invalid;   // every refusal below, unless the step says otherwise
     RawFile raw;
+    std::unique_ptr<session_pages::Reader> pages;
     uint64_t size = 0;
-    if (!raw.open_session(path, size)) {
+    if(session_pages::is_manifest(path)) {pages=std::make_unique<session_pages::Reader>(path);size=pages->size();}
+    if (!pages && !raw.open_session(path, size)) {
         st.error = raw.refused() ? SessionError::invalid : raw.kind();
         error = "session file: " + path + ": " + raw.error();
         return false;
@@ -1196,7 +1233,8 @@ bool read_impl(const std::string& path, const SessionFileIdentity& id, SavedConv
                 (max_size == UINT64_MAX ? std::string() : " of " + std::to_string(max_size));
         return false;
     }
-    FileSource f(raw);
+    auto input = pages ? std::make_unique<FileSource>(*pages) : std::make_unique<FileSource>(raw);
+    FileSource& f=*input;
     if (!f.ok()) { st.error = SessionError::memory; error = "session file: " + f.error(); return false; }
     // installed before the first block (the header's) is read: every block reports, the first one included
     if (limits.progress) f.progress.emplace(limits.progress);
@@ -1254,6 +1292,10 @@ bool session_file_read(const std::string& path, const SessionFileIdentity& id, S
         error = "session file: out of memory while reading " + path;
         st.error = SessionError::memory;
         ok = false;
+    } catch (const session_pages::Failure& e) {
+        error=e.what();st.error=e.kind;ok=false;
+    } catch (const std::exception& e) {
+        error=e.what();st.error=SessionError::io;ok=false;
     }
     if (status) *status = st;
     return ok;

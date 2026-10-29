@@ -1,6 +1,7 @@
 // CPU-only tests for the on-disk session format (include/strata/core/conversation_file.hpp).
 // Built with -DSTRATA_BUILD_CONVERSATION_TESTS=ON; no CUDA, no model.
 #include "strata/core/conversation_file.hpp"
+#include "strata/core/session_pages.hpp"
 #include "strata/core/session_save_reclaim.hpp"
 
 #include <array>
@@ -778,6 +779,80 @@ int main() {
         check(slurp(target) == std::vector<char>(7, 't'), "the link's target is untouched");
         struct stat st {};
         check(::stat(link.c_str(), &st) == 0 && (st.st_mode & 0777) == 0600, "the session file is mode 0600");
+    }
+#endif
+
+#ifndef _WIN32
+    // Shared storage is a byte-exact adapter, including across differently-sized branches. Native corruption,
+    // model identity and allocation checks still run before the destination image is replaced.
+    {
+        auto root=dir/"paged";fs::create_directory(root);auto path=root/"first.spg";
+        SessionWriteOptions opt;opt.paged=true;
+        SessionStatus status;
+        auto physical=[&]() {uint64_t n=0;for(const auto& p:fs::directory_iterator(root/"pages"))n+=p.file_size();return n;};
+        check(session_file_write(path.string(),original,id,written,error,opt,&status),"paged: write");
+        check(status.published && written==image.size(),"paged: logical size and publication");
+        SavedConversation restored;
+        check(session_file_read(path.string(),id,restored,written,error) && same(original,restored),"paged: round trip");
+        {
+            session_pages::Reader reader(path.string());std::vector<char> raw(reader.size());
+            check(reader.read_some(reinterpret_cast<uint8_t*>(raw.data()),raw.size())==static_cast<long long>(raw.size()) && raw==image,"paged: native serialization bytes identical");
+        }
+        auto first=physical();
+        check(session_file_write((root/"duplicate.spg").string(),original,id,written,error,opt),"paged: duplicate write");
+        check(physical()==first,"paged: identical snapshots add zero page bytes");
+        auto branch=sample();branch.live.ids.push_back(2000);branch.live.gdn[30]^=7;
+        branch.kv[0].k=pattern((18u<<20)+137,0);
+        check(session_file_write((root/"branch.spg").string(),branch,id,written,error,opt),"paged: longer branch");
+        check(physical()-first < (4u<<20),"paged: changed lengths retain shared leading tensor pages");
+        session_pages::hot().clear();
+        check(session_file_read((root/"branch.spg").string(),id,restored,written,error) && same(branch,restored),"paged: cold restore with no hot pages");
+        SessionFileIdentity wrong=id;++wrong.model;
+        check(!session_file_read(path.string(),wrong,restored,written,error) && same(branch,restored),"paged: wrong model leaves destination intact");
+        const auto manifest=slurp(path);auto bad=manifest;bad.back()^=1;spit(path,bad);
+        check(!session_file_read(path.string(),id,restored,written,error) && same(branch,restored),"paged: bad manifest leaves destination intact");spit(path,manifest);
+        fs::path page;for(const auto& p:fs::directory_iterator(root/"pages"))if(p.file_size()>1000000){page=p.path();break;}
+        check(!page.empty(),"paged: large data page exists");
+        const auto page_data=slurp(page);auto corrupt=page_data;corrupt[0]^=1;spit(page,corrupt);session_pages::hot().clear();
+        check(!session_file_read(path.string(),id,restored,written,error) && same(branch,restored),"paged: corrupt page leaves destination intact");
+        spit(page,page_data);session_pages::hot().clear();
+        check(session_file_read(path.string(),id,restored,written,error) && same(original,restored),"paged: recovered data reads");
+        // Missing and linked objects fail closed; they cannot hang the engine or silently poison KV.
+        fs::remove(page);session_pages::hot().clear();
+        check(!session_file_read(path.string(),id,restored,written,error) && same(original,restored),"paged: missing page leaves destination intact");
+        auto target=root/"target.blk";spit(target,page_data);fs::create_symlink(target,page);
+        check(!session_file_read(path.string(),id,restored,written,error),"paged: linked page rejected");fs::remove(page);spit(page,page_data);
+        // Source failure before the manifest commit keeps the previous complete snapshot usable.
+        auto meta=sample();meta.kv.clear();SessionKvSource source;source.sizes[0]=4u<<20;
+        source.read=[](size_t,size_t,void*,size_t){return false;};
+        check(!session_file_write(path.string(),meta,{source},id,written,error,opt,&status) && !status.published,"paged: source failure before commit");
+        check(slurp(path)==manifest,"paged: source failure preserves previous manifest");
+        for(const char* step:{"write","file_flush","rename","dir_flush"}) {
+            opt.fault=[step](const char* where){return std::strcmp(step,where)==0?ENOSPC:0;};
+            check(!session_file_write(path.string(),original,id,written,error,opt,&status) && status.error==SessionError::storage,
+                  "paged: injected storage failure has the native storage category");
+            check(status.published==(std::strcmp(step,"dir_flush")==0),"paged: failure publication status");
+            check(slurp(path)==manifest,"paged: failed write retains a complete manifest");
+            for(const auto& p:fs::directory_iterator(root))check(p.path().filename().string().rfind(".page-tmp-",0)!=0,"paged: failed write removes its temporary manifest");
+        }
+        opt.fault={};
+        // The hot tier is bounded and immutable; eviction must not affect an in-flight reader's bytes.
+        session_pages::hot().clear();
+        const char* prior=std::getenv("STRATA_SESSION_PAGE_HOT_MIB");
+        const std::string old_limit=prior?prior:"";
+        ::setenv("STRATA_SESSION_PAGE_HOT_MIB","1",1);
+        auto small=std::make_shared<const std::vector<uint8_t>>(700000,42);
+        session_pages::hot().put("a",small);auto held=session_pages::hot().get("a");
+        session_pages::hot().put("b",small);
+        check(!session_pages::hot().get("a") && bool(session_pages::hot().get("b")),"paged: hot LRU evicts to byte budget");
+        check(held && held->at(0)==42,"paged: eviction preserves an active reader");
+        session_pages::hot().put("too-large",std::make_shared<const std::vector<uint8_t>>(2u<<20));
+        check(!session_pages::hot().get("too-large"),"paged: oversized hot page bypasses admission");
+        session_pages::hot().clear();::setenv("STRATA_SESSION_PAGE_HOT_MIB","0",1);
+        session_pages::hot().put("disabled",small);
+        check(!session_pages::hot().get("disabled"),"paged: zero budget disables hot tier");
+        if(prior)::setenv("STRATA_SESSION_PAGE_HOT_MIB",old_limit.c_str(),1);
+        else ::unsetenv("STRATA_SESSION_PAGE_HOT_MIB");
     }
 #endif
 

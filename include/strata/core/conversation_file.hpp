@@ -142,6 +142,7 @@ int64_t session_phase_limit_s(uint64_t bytes);
 
 // Optional knobs of a write.
 struct SessionWriteOptions {
+    bool paged = false;            // opt-in shared immutable pages + manifest (Linux); legacy bytes unchanged otherwise
     // the free-space PREFLIGHT: refused when the disk has less than the new file plus this many bytes free before the
     // write starts.  Not a reservation: other writers can take the space afterwards.
     uint64_t min_free_bytes = 0;

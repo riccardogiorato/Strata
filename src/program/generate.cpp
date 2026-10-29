@@ -13559,6 +13559,31 @@ int main(int argc, char** argv) {
             // (fingerprint file, state capture, file flush, rename + folder flush, validation, device transfer):
             // that step is allowed <seconds> (session_phase_limit_s) by the watchdog and by the server, no more.
             // (A verifier commit that fails before the command still answers ERR and exits, as for a request.)
+            // Read-only prefix query for persistent tier selection. A hot native entry wins a tie, so the
+            // server never replaces useful RAM state merely because an SSD snapshot exists. Text, serial only.
+            if(line.rfind("CACHEMATCH ",0)==0) {
+                std::istringstream input(line.substr(11));int steer=1;std::string list;
+                bool valid=bool(input>>steer>>list) && (steer==0 || steer==1);
+                std::vector<int32_t> query;
+                size_t at=0;
+                while(valid && at<list.size()) {
+                    char* end=nullptr;errno=0;long value=std::strtol(list.c_str()+at,&end,10);
+                    if(end==list.c_str()+at || errno || value<0 || value>INT32_MAX || (*end && *end!=',')) {valid=false;break;}
+                    query.push_back(int32_t(value));at=size_t(end-list.c_str());if(at<list.size())++at;
+                    if(query.size()>size_t(o.max_context)){valid=false;break;}
+                }
+                int64_t matched=0;
+                const bool cv=strata::kernels::cvec().loaded() ? steer!=0 : true;
+                if(valid && !query.empty() && o.batch<=0 && stages.empty() && !multi_gpu && o.prompt_cache>0) {
+                    auto consider=[&](const std::vector<int32_t>& pre,const std::vector<ImgKey>& imgs) {
+                        if(imgs.empty() && !pre.empty() && pre.size()<query.size() && std::equal(pre.begin(),pre.end(),query.begin()))
+                            matched=std::max<int64_t>(matched,pre.size());
+                    };
+                    if(cvec_cached==cv) {if(live_ok)consider(live,live_imgs);for(const auto& c:checks)consider(c.ids,c.imgs);}
+                    matched=std::max(matched,conversations.best(query,{},cv).tokens);
+                }
+                std::printf("CACHEMATCH %lld\n",(long long)matched);std::fflush(stdout);continue;
+            }
             if (line.rfind("SAVE ", 0) == 0 || line.rfind("RESTORE ", 0) == 0) {
                 const bool save = line[0] == 'S';
                 const std::string path = line.substr(save ? 5 : 8);
@@ -13687,6 +13712,8 @@ int main(int argc, char** argv) {
                         }
                         capture_ms = ms();
                         strata::core::SessionWriteOptions wo;
+                        const char* paged_env=std::getenv("STRATA_SESSION_PAGED");
+                        wo.paged=paged_env && std::strcmp(paged_env,"1")==0;
                         wo.min_free_bytes = (uint64_t) o.session_min_free_mib << 20;
                         wo.progress = moving;
                         wo.phase = blocking;
