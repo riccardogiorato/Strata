@@ -13643,6 +13643,8 @@ int main(int argc, char** argv) {
                 }
                 if (save) {
                     if (!live_ok || live.empty()) { refuse("no complete session to save"); continue; }
+                    const char* paged_env=std::getenv("STRATA_SESSION_PAGED");
+                    const bool paged_session=paged_env && std::strcmp(paged_env,"1")==0;
                     size_t bytes = 0, kept = 0;
                     double capture_ms = 0;
                     try {
@@ -13682,6 +13684,10 @@ int main(int argc, char** argv) {
                             }
                         }
                         auto admit = [&](uint64_t need, std::string& why) {
+                            if(paged_session) {
+                                const uint64_t extra=strata::core::session_page_cache_reserve_bytes();
+                                need=need>UINT64_MAX-extra ? UINT64_MAX : need+extra;
+                            }
                             const auto mem = strata::core::sample_host_memory();
                             const std::optional<uint64_t> avail = mem ? std::optional<uint64_t>(mem->available) : std::nullopt;
                             if (strata::core::conversation_memory_admit(avail, need, floor)) return true;
@@ -13712,8 +13718,7 @@ int main(int argc, char** argv) {
                         }
                         capture_ms = ms();
                         strata::core::SessionWriteOptions wo;
-                        const char* paged_env=std::getenv("STRATA_SESSION_PAGED");
-                        wo.paged=paged_env && std::strcmp(paged_env,"1")==0;
+                        wo.paged=paged_session;
                         wo.min_free_bytes = (uint64_t) o.session_min_free_mib << 20;
                         wo.progress = moving;
                         wo.phase = blocking;

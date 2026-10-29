@@ -1031,6 +1031,11 @@ uint64_t session_read_max_file_bytes(const SessionReadLimits& l) {
     return std::min(n, l.max_file_bytes);
 }
 
+uint64_t session_page_cache_reserve_bytes() noexcept {
+    try {return session_pages::hot().growth() + 2*session_pages::page_bytes + (1u<<20);}
+    catch(...) {return UINT64_MAX;}
+}
+
 uint64_t session_read_peak_bytes(uint64_t file_bytes) {
     const uint64_t segments = file_bytes / kBlock + 1;
     // the parsed image (about the payload), the read buffer, a page per buffer segment, the small vectors
@@ -1259,7 +1264,7 @@ bool read_impl(const std::string& path, const SessionFileIdentity& id, SavedConv
     }
     if (limits.admit) {
         std::string why;
-        if (!limits.admit(session_read_peak_bytes(size), why)) {
+        if (!limits.admit(sat_add(session_read_peak_bytes(size),pages ? session_page_cache_reserve_bytes() : 0), why)) {
             st.error = SessionError::memory;
             error = "session file: " + why;
             return false;

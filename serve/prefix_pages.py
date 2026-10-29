@@ -107,6 +107,8 @@ class PrefixPages:
         env = {**os.environ, **(given or {})}
         directory = env.get('STRATA_PREFIX_CACHE_DIR')
         if not directory: return None
+        if not 0 <= int(env.get('STRATA_SESSION_PAGE_HOT_MIB', '256')) <= 16384:
+            raise ValueError('hot page budget must be in 0..16384 MiB')
         if env.get('STRATA_SESSION_PAGED') != '1':
             raise ValueError('persistent prefix cache requires STRATA_SESSION_PAGED=1')
         if any(a in args for a in ('--batch', '--layer-split', '--peer-device')):

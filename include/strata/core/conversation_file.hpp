@@ -140,6 +140,10 @@ using SessionPhase = std::function<void(const char* phase, uint64_t bytes)>;
 // 4 MiB (a slow disk or network folder at 4 MiB/s), at most an hour.  1.2 GB: 345 s.
 int64_t session_phase_limit_s(uint64_t bytes);
 
+// Additional possible host allocation by the paged adapter (unfilled hot budget and bounded staging overhead).
+// Callers add this to their native session admission only for paged operations. Invalid settings return UINT64_MAX.
+uint64_t session_page_cache_reserve_bytes() noexcept;
+
 // Optional knobs of a write.
 struct SessionWriteOptions {
     bool paged = false;            // opt-in shared immutable pages + manifest (Linux); legacy bytes unchanged otherwise

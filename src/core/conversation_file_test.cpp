@@ -842,7 +842,9 @@ int main() {
         const std::string old_limit=prior?prior:"";
         ::setenv("STRATA_SESSION_PAGE_HOT_MIB","1",1);
         auto small=std::make_shared<const std::vector<uint8_t>>(700000,42);
+        const auto empty_reserve=session_page_cache_reserve_bytes();
         session_pages::hot().put("a",small);auto held=session_pages::hot().get("a");
+        check(empty_reserve-session_page_cache_reserve_bytes()==small->size(),"paged: host admission charges only unfilled hot budget");
         session_pages::hot().put("b",small);
         check(!session_pages::hot().get("a") && bool(session_pages::hot().get("b")),"paged: hot LRU evicts to byte budget");
         check(held && held->at(0)==42,"paged: eviction preserves an active reader");

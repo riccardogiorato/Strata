@@ -21,7 +21,7 @@ Use this branch's rebuilt engine **and** its Python server. Add these entries to
 }
 ```
 
-Use `--prompt-cache 20 --prompt-cache-every 8192` for a dense checkpoint chain at a 131072-token context capacity. These checkpoint settings consume additional host RAM; use the same settings in a comparison with persistence disabled. The existing native memory floor and conversation-cache budgets still apply. The page cache is an additional bounded host allocation, not borrowed VRAM. Default page budget is 256 MiB; zero disables that tier. The experiment uses 1024 MiB. Its Linux page-cache residency is managed separately by the OS.
+Use `--prompt-cache 20 --prompt-cache-every 8192` for a dense checkpoint chain at a 131072-token context capacity. These checkpoint settings consume additional host RAM; use the same settings in a comparison with persistence disabled. The existing native memory floor and conversation-cache budgets still apply. The page cache is an additional bounded host allocation, not borrowed VRAM. Save/restore RAM admission reserves its unfilled budget as well as the native state copies. Default page budget is 256 MiB; zero disables that tier. The experiment uses 1024 MiB. Its Linux page-cache residency is managed separately by the OS.
 
 Start `python -m serve.server --engine strata --config /path/to/config.json` from this source checkout. Set `STRATA_PREFIX_SAVE_GAIN=0` to save every distinct completed input instead of deferring small changes. Removing `STRATA_PREFIX_CACHE_DIR` disables automatic persistence; no proxy or client-specific session header is required. Existing raw session files remain readable. `STRATA_SESSION_PAGED=1` also selects paged storage for explicit native SAVE commands; use a dedicated private directory.
 

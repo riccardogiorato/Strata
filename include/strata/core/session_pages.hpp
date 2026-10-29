@@ -129,6 +129,9 @@ public:
         catch(...) {order_.pop_front();throw;}
         bytes_+=added;
     }
+    uint64_t growth() {
+        std::lock_guard<std::mutex> lock(mutex_);const auto cap=hot_limit();return cap>bytes_?cap-bytes_:0;
+    }
     void clear() {std::lock_guard<std::mutex> lock(mutex_);entries_.clear();order_.clear();bytes_=0;}
 };
 inline HotCache& hot() {static HotCache c;return c;}
