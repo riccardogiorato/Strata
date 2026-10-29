@@ -124,7 +124,7 @@ class PrefixPages:
         binary = Path(exe)
         if not binary.is_absolute(): binary = Path(cwd or os.getcwd())/binary
         with binary.open('rb') as f: digest = hashlib.file_digest(f, 'sha256').hexdigest()
-        namespace = hashlib.sha256(json.dumps([digest, identity_args, relevant], sort_keys=True).encode()).hexdigest()
+        namespace = hashlib.sha256(json.dumps([digest, str(Path(cwd or os.getcwd()).resolve()), identity_args, relevant], sort_keys=True).encode()).hexdigest()
         root = Path(directory).expanduser()
         if not root.is_absolute(): root = Path(cwd or os.getcwd())/root
         return cls(root/namespace,

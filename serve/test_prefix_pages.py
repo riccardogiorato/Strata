@@ -111,6 +111,15 @@ class PrefixTests(unittest.TestCase):
             c.before([*range(12),99],True,e)
         self.assertEqual([x[0] for x in e.calls],['query'])
         self.assertEqual(c.events[-1]['event'],'ram_preferred')
+    def test_namespace_is_stable_for_profiles_but_scopes_relative_model_paths(self):
+        binary=self.root/'engine';binary.write_bytes(b'fake executable')
+        def open_cache(cwd,profile):
+            env={'STRATA_SESSION_PAGED':'1','STRATA_PREFIX_CACHE_DIR':str(self.root/'cache')}
+            engine=SimpleNamespace(spawn=(str(binary),['--pack','pack/model','--expert-profile',profile],str(cwd),None,env))
+            return PrefixPages.from_engine(engine)
+        a=open_cache(self.root/'model-a','one.profile');first=a.root;a.close()
+        b=open_cache(self.root/'model-a','two.profile');self.assertEqual(first,b.root);b.close()
+        c=open_cache(self.root/'model-b','two.profile');self.assertNotEqual(first,c.root);c.close()
     def test_disabled_does_not_read_binary(self):
         e=SimpleNamespace(spawn=('missing',[],None,None,{}))
         with patch.dict(os.environ,{},clear=True):self.assertIsNone(PrefixPages.from_engine(e))
