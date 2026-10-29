@@ -20,11 +20,11 @@ def manifest(path, ids, boundaries=(), *, flags=2, pages=None):
 
 class FakeEngine:
     def __init__(self, ids=(), boundaries=(), ram=0):
-        self.ids=ids;self.boundaries=boundaries;self.ram=ram;self.calls=[];self.refuse=False
+        self.ids=ids;self.boundaries=boundaries;self.ram=ram;self.calls=[];self.refuse=False;self.refuse_kind='invalid'
     def prefix_match(self, ids,cvec=True):self.calls.append(('query',list(ids)));return self.ram
     def session_file(self,action,path):
         self.calls.append((action,path))
-        if self.refuse:raise SessionRefused('invalid','corrupt')
+        if self.refuse:raise SessionRefused(self.refuse_kind,'refused')
         if action=='save':manifest(path,self.ids,self.boundaries)
         return {'tokens':len(self.ids),'bytes':16,'ms':1}
 
@@ -65,6 +65,11 @@ class PrefixTests(unittest.TestCase):
     def test_native_refusal_is_a_miss(self):
         self.seed();c=self.start();e=FakeEngine();e.refuse=True;c.before([*range(12),99],True,e)
         self.assertFalse(c.entries);self.assertEqual(c.physical_bytes,0)
+    def test_memory_refusal_keeps_valid_snapshot(self):
+        path=self.seed();c=self.start();e=FakeEngine();e.refuse=True;e.refuse_kind='memory'
+        c.before([*range(12),99],True,e)
+        self.assertIn(path.name,c.entries);self.assertTrue(path.exists())
+        self.assertEqual(c.events[-1]['event'],'restore_deferred')
     def test_invalid_manifest_is_collected(self):
         p=self.seed();p.write_bytes(b'wrong');c=self.start();self.assertFalse(c.entries);self.assertFalse(p.exists())
     def test_two_owners_are_rejected(self):

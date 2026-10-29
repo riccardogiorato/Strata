@@ -234,8 +234,11 @@ class PrefixPages:
             # A native refusal leaves live state intact. A dead/desynchronized engine must propagate to the normal
             # server recovery path, never be treated as a successful cache miss.
             if e.__class__.__name__ != 'SessionRefused': raise
+            if getattr(e, 'kind', None) in ('memory', 'storage'):
+                # Transient pressure is not corruption. Retain a valid snapshot for a later request/restart.
+                self.event('restore_deferred', error_kind=e.kind, error=str(e)); return
             self.entries.pop(entry.path.name, None); entry.path.unlink(missing_ok=True)
-            self.event('restore_refused', error=str(e)); self.enforce_quota(); return
+            self.event('restore_refused', error_kind=getattr(e, 'kind', None), error=str(e)); self.enforce_quota(); return
         entry.accessed=time.time(); self.publish_access()
         self.event('restore', seconds=time.monotonic()-t, matched_tokens=score, logical_bytes=entry.logical,
                    native_ms=result.get('ms'))
