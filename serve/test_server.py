@@ -4250,6 +4250,36 @@ class ThinkingBudget(unittest.TestCase):
         self.assertEqual((msg["reasoning_content"], msg["content"]), (ThinkingEngine.THOUGHT, ThinkingEngine.ANSWER))
         self.assertEqual(len(self.engine.prompts), 1)
 
+    def test_plain_prompt_budget_closes_without_authored_prose(self):
+        from serve.server import REASONING_CLOSE
+        self.svc.plain_prompt = True
+        code, b = self.openai(reasoning_budget_tokens=20)
+        self.assertEqual(code, 200, b)
+        msg = b["choices"][0]["message"]
+        self.assertEqual(msg["content"], ThinkingEngine.ANSWER)
+        first, second = self.engine.prompts
+        self.assertEqual(second, first + self.tok.encode(ThinkingEngine.THOUGHT[:20])
+                         + self.tok.encode(REASONING_CLOSE, parse_special=True))
+
+    def test_plain_prompt_preserves_harness_tools_and_thinking_switch(self):
+        self.svc.plain_prompt = True
+        self.svc.effort_end = True
+        messages = [{"role": "system", "content": "HARNESS RULES"},
+                    {"role": "user", "content": "TASK TEXT"}]
+        tools = [{"type": "function", "function": {"name": "read_file",
+                  "parameters": {"type": "object", "properties": {}}}}]
+        for effort in ("low", "medium", "high", "xhigh"):
+            for enabled in (True, False):
+                kw = {"reasoning_effort": effort, "enable_thinking": enabled}
+                rendered = self.svc.render_prompt(messages, tools, kw)
+                expected = self.svc.template.render(messages, tools=tools,
+                    reasoning_effort="medium", enable_thinking=enabled)
+                self.assertEqual(rendered, expected)
+                self.assertIn("HARNESS RULES", rendered)
+                self.assertIn("TASK TEXT", rendered)
+                self.assertIn("read_file", rendered)
+                self.assertNotIn("Reasoning effort is set", rendered)
+
     def test_the_budget_wraps_up_the_thinking(self):
         from serve.server import REASONING_WRAP_UP
         code, b = self.openai(reasoning_budget_tokens=20)

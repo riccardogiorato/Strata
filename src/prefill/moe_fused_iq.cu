@@ -1674,6 +1674,7 @@ struct DevInfo {
     bool done = false, ok = false;
     bool g1151 = false; // gfx1151 (Strix Halo): Q8_0 down layers on the F16 kernel by default (q8d_f16_default)
     bool w12 = false;   // gfx12 (RDNA4): the native kernels only - the Q2_0 pack's (moe_fused.cu) are not ported there
+    bool t75_iq = false; // experimental codebook formats: only the 128-row tile fits all codebooks
     bool t75 = false;   // Turing (STRATA_PF_FUSED_SM75): the Q2_0 / Q2_0 layers only (what was set up and checked there)
     bool q2n = false;   // sm_80+ with STRATA_PF_FUSED_Q2N=1: the native Q2_0 pack's Q2_0 gate/up is set up as well (opt-in)
     bool s120 = false;  // compute capability 12.0 (sm120_series.hpp): the default for the formats measured there
@@ -1820,7 +1821,17 @@ const DevInfo& dev_info() {
     int occ = 1 << 20;
     if (major < 8) {   // Turing: the canonical Q2_0 pack's kernels (the codebook formats' do not fit 64 KB at 4 warps a row)
         d.t75 = true;
-        d.ok = setup_one<T_Q2_0, true>(occ) && setup_one<T_Q2_0, false>(occ);
+        const char* iq = std::getenv("STRATA_PF_FUSED_SM75_IQ");
+        d.t75_iq = iq != nullptr && iq[0] == '1';
+        if (d.t75_iq) {
+            // WW=2 reduces decoded-weight staging enough to fit SM75's 64 KiB limit,
+            // including the 8 KiB IQ2_S codebook. Never dispatch the larger WW=4 tile.
+            d.ok = setup_ww<T_IQ2_XXS, true, 2>(occ) && setup_ww<T_IQ2_XS, true, 2>(occ) &&
+                   setup_ww<T_IQ2_S, true, 2>(occ) && setup_ww<T_IQ3_XXS, true, 2>(occ) &&
+                   setup_ww<T_IQ3_S, true, 2>(occ) && setup_ww<T_IQ4_XS, true, 2>(occ) &&
+                   setup_ww<T_Q2_0, true, 2>(occ) && setup_ww<T_Q2_0, false, 2>(occ) &&
+                   setup_ww<T_IQ4_NL, false, 2>(occ);
+        } else d.ok = setup_one<T_Q2_0, true>(occ) && setup_one<T_Q2_0, false>(occ);
         d.occ = d.ok ? occ : 1;
         cudaGetLastError();
         return d;
@@ -2010,7 +2021,7 @@ bool native_supported(int gu_type, int d_type) {
     if (env < 0 && gu_type != T_IQ3_S && gu_type != T_IQ3_XXS && !(gu_type == T_Q2_0 && strata::core::kGfx12PromptDefaultsOn)) return false;
     const DevInfo& d = dev_info();
     if (!d.ok || !d_covered_on(d_type, d)) return false;
-    if (d.t75 && (gu_type != T_Q2_0 || d_type != T_Q2_0)) return false;
+    if (d.t75 && !d.t75_iq && (gu_type != T_Q2_0 || d_type != T_Q2_0)) return false;
     if (env < 0) return d.w12;
     return requested() || d.w12;
 }
@@ -2118,7 +2129,7 @@ void experts_native(const Batch& b, const NativeGeom& g, int n_expert, int64_t n
         experts_native(w, g, n_expert, n, scratch, xa, src, ha, dm, stream);
         return;
     }
-    const int ww = pick_ww(n, n_expert);
+    const int ww = d.t75_iq ? 2 : pick_ww(n, n_expert);
     // the most 64-row tiles the batch can have (every row in it, plus a partial tile per expert) - the items of the
     // ones inside a larger item end at once
     const int64_t tiles = (n + kTileRows - 1) / kTileRows + (b.e1 - b.e0);

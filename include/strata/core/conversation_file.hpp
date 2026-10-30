@@ -197,10 +197,11 @@ struct SessionSaveLive {
 uint64_t session_save_peak_bytes(const ConversationCheckpoint* deepest, const SessionSaveLive& live);
 // The SAVE's RAM PREFLIGHT, BEFORE anything is copied: `admit` is asked for session_save_peak_bytes; only when it
 // agrees is the deepest checkpoint copied into `out`.  On a refusal nothing was allocated, `out` is empty, `chain`
-// and the live state are untouched and no file was opened.  Not a reservation.
+// and the live state are untouched and no file was opened. Not a reservation.
+// preserve_all is opt-in: admit two copies of every checkpoint, then retain the complete chain.
 bool session_save_checkpoints(const std::vector<ConversationCheckpoint>& chain, const SessionSaveLive& live,
                               const std::function<bool(uint64_t need_bytes, std::string& why)>& admit,
-                              std::vector<ConversationCheckpoint>& out, std::string& why);
+                              std::vector<ConversationCheckpoint>& out, std::string& why, bool preserve_all = false);
 
 // What a read checks before it allocates.  Every count is checked against the bytes left in the payload and against
 // these limits BEFORE its array is allocated; the defaults accept whatever the payload can hold.  The engine sets all
