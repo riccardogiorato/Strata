@@ -6,13 +6,13 @@ This is an opt-in local branch based on the tested v0.2.7 configuration. It is n
 
 ## Enable
 
-Use this branch's rebuilt engine **and** its Python server. Add these entries to the server config's `env` object:
+Use this branch's rebuilt engine **and** its Python server. For the measured balanced 64 GB profile, set `--conversation-cache-mib 2048 --conversation-cache-slots 1` in `args`, and add these entries to the server config's `env` object:
 
 ```json
 {
   "STRATA_SESSION_PAGED": "1",
   "STRATA_PREFIX_CACHE_DIR": "/absolute/path/to/private-ssd-cache",
-  "STRATA_SESSION_PAGE_HOT_MIB": "1024",
+  "STRATA_SESSION_PAGE_HOT_MIB": "4096",
   "STRATA_PREFIX_DISK_MIB": "24576",
   "STRATA_PREFIX_MAX_ENTRIES": "128",
   "STRATA_PREFIX_MIN_TOKENS": "8192",
@@ -21,7 +21,7 @@ Use this branch's rebuilt engine **and** its Python server. Add these entries to
 }
 ```
 
-Use `--prompt-cache 20 --prompt-cache-every 8192` for a dense checkpoint chain at a 131072-token context capacity. These checkpoint settings consume additional host RAM; use the same settings in a comparison with persistence disabled. The existing native memory floor and conversation-cache budgets still apply. The page cache is an additional bounded host allocation, not borrowed VRAM. Save/restore RAM admission reserves its unfilled budget as well as the native state copies. Default page budget is 256 MiB; zero disables that tier. The experiment uses 1024 MiB. Its Linux page-cache residency is managed separately by the OS.
+Use `--prompt-cache 20 --prompt-cache-every 8192` for a dense checkpoint chain at a 131072-token context capacity. These checkpoint settings consume additional host RAM; use the same settings in a comparison with persistence disabled. The existing native memory floor and conversation-cache budgets still apply. The page cache is an additional bounded host allocation, not borrowed VRAM. Save/restore RAM admission reserves its unfilled budget as well as the native state copies. Default page budget is 256 MiB; zero disables that tier. The initial paired experiment used 1024 MiB; the later balanced profile uses 4096 MiB with `--conversation-cache-mib 2048 --conversation-cache-slots 1`. Its Linux page-cache residency is managed separately by the OS.
 
 Start `python -m serve.server --engine strata --config /path/to/config.json` from this source checkout. Set `STRATA_PREFIX_SAVE_GAIN=0` to save every distinct completed input instead of deferring small changes. Removing `STRATA_PREFIX_CACHE_DIR` disables automatic persistence; no proxy or client-specific session header is required. Existing raw session files remain readable. `STRATA_SESSION_PAGED=1` also selects paged storage for explicit native SAVE commands; use a dedicated private directory.
 
@@ -45,3 +45,11 @@ Linux/POSIX, one serial native engine per cache namespace, text only. Parallel b
 Compare cold requests, native RAM hits, evicted branches, process restart and edited histories separately. Include save/restore time in wall time and TTFT; measure newly read tokens per prefill second, generated tokens per decode second and task correctness. Keep expert-residency hits separate from prefix-token hits. No production default changes are made by this branch.
 
 Inspired by [oMLX](https://github.com/jundot/omlx/tree/6b413c900352db1382466cf4b7f0825f61a550a9), especially `omlx/cache/paged_ssd_cache.py`, `prefix_cache.py` and `boundary_snapshot_store.py`: persistent content-addressed blocks, bounded hot/cold tiers, and explicit coherent recurrent-state boundaries. This is original Strata-specific code; no MLX implementation was copied.
+
+## Local measured profile
+
+On an RTX 2080 8 GiB / i5-9600K / 64 GB RAM with Swift 1.5 Flash-Next IQ2_XS, two reversed-order 121K-token comparisons reduced cold restart request latency from 144.2 to 10.5 seconds, excluding engine boot. A tool-using coding task with one restart passed in both arms and took 359.9 versus 244.7 seconds including boots, with different output counts. New long snapshots added 9–14 seconds. Ordinary scored agent decode stayed about 60.5 tok/s; continuous coding without SSD restores incurred write overhead. This is not a general decode improvement.
+
+A later one-run allocation sweep favored 2048 MiB native parked RAM (one slot) plus 4096 MiB hot pages as a balanced local option: 4.31 seconds to return to an evicted 121K branch, 0.36 seconds for a 5K conversation, 48.2 GiB peak sampled RSS and 16 MiB peak process swap. It served 71.7% of serialized restore bytes from hot pages. Disabling native parking made the short return take 8.79 seconds. These allocation results are exploratory, not repeated estimates or a change to production defaults.
+
+See [the local benchmark record](../bench/results/2026-10-30-persistent-prefix-pages/README.md).

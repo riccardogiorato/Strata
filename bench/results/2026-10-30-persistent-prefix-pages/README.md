@@ -1,0 +1,13 @@
+# Persistent prefix pages: local RTX 2080 evidence
+
+This opt-in feature preserves reusable text prefixes across engine restarts and native RAM eviction. On a 121K-token workload, two reversed-order pairs reduced cold restart request latency from 144.2 to 10.5 seconds, excluding engine startup. All code checks passed. A real read/write/test task with one restart passed in both arms and finished in 359.9 / 244.7 seconds including startup; the enabled run generated fewer tokens too.
+
+The cost is synchronous saving: new 121K histories took about 15 seconds longer; related new branches about 10 seconds longer in the initial profile. Both ordinary agent suites passed 10/10 scored tasks, with essentially unchanged 60.5 tok/s decode. All eleven tasks took 763 / 940 seconds: different model trajectories and 62.4 seconds of snapshot writes explain the increase. There were no SSD restores in that ordinary workload. Task8 already passed before edits and is excluded from quality scoring, but retained in whole-suite runtime.
+
+The later exploratory allocation of 2 GiB native parked RAM / one slot plus 4 GiB shared pages recovered the long branch in 4.31 seconds and a short conversation in 0.36 seconds. Peak sampled RSS was 48.2 GiB, process swap 16 MiB. No production settings were changed.
+
+[Measurements](measurements.json) contain token-weighted prefill/decode rates, prefix and expert hit rates, individual latency ranges, speed probes and memory observations. The full local harness and raw evidence are in `local-ai-rtx2080/experiments/strata-paged-cache-20261029`. The initial paired profile used 8 GiB native RAM / two slots plus 1 GiB hot pages; the allocation sweep is separate, one run per profile. Both paired arms used 20 checkpoints at 8192-token intervals, the same binary/model/profile and all existing PCIe/preload/fused-kernel settings. This is a custom A/B experiment, not a claim of conformance to the draft standard benchmark protocol.
+
+Validation: 264 native conversation-file checks plus memory/save-reclaim suites; 127 Python tests (126 pass, one optional JSON-schema skip); 62 GPU function checks; two long tool-using coding tasks; two usual suites with 20/20 scored tasks. Legacy serialization golden bytes and three real sessions round-tripped exactly. Not tested: HIP, SYCL, Windows, parallel/split engines or vision persistence.
+
+Inspired by oMLX shared persistent blocks, hot/cold tiers and coherent recurrent-state boundaries. No MLX code was copied. This stores serialized host/SSD state; it does not replace Strata's GPU KV allocator or port oMLX's background writer. [Configuration and limits](../../../docs/PERSISTENT_PREFIX_PAGES.md).
