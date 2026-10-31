@@ -25,6 +25,11 @@ void dflash2_select_bf16(const int32_t* candidates, const float* unary, const fl
                          const uint16_t* predecessor, const uint16_t* successor, const int32_t* anchor,
                          int32_t* out, float* confidence, int rows, int top_k, int rank, void* stream,
                          bool reference = false);
+// Q4_K codebooks stay compressed; only selected token values are decoded on demand.
+void dflash2_select_q4_k(const int32_t* candidates, const float* unary, const float* hidden,
+                         const void* predecessor, const void* successor, const int32_t* anchor,
+                         int32_t* out, float* confidence, int rows, int top_k, int rank, void* stream,
+                         bool reference = false);
 // Completed target residual [rows][hc][hidden], before the next layer's learned HC read.
 void dflash2_hc_mean(const float* residual, float* out, uint16_t* out_bf16,
                      int rows, int hidden, int hc, void* stream);

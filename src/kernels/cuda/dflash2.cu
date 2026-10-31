@@ -83,6 +83,21 @@ __global__ void topk_parallel_kernel(const float* logits, const int32_t* candida
         __syncthreads();
     }
 }
+// GGML Q4_K: two FP16 scales, twelve packed 6-bit sub-scales/minima, 256 nibbles.
+struct Q4KCodebookBlock { uint16_t d, dmin; uint8_t scales[12], qs[128]; };
+static_assert(sizeof(Q4KCodebookBlock) == 144);
+__device__ float codebook_value(const Q4KCodebookBlock* p, size_t i) {
+    const auto& b = p[i / 256];
+    const int lane = i % 256, group = lane / 32;
+    const int scale = group < 4 ? (b.scales[group] & 63) :
+        ((b.scales[group + 4] & 15) | ((b.scales[group - 4] >> 6) << 4));
+    const int minimum = group < 4 ? (b.scales[group + 4] & 63) :
+        ((b.scales[group + 4] >> 4) | ((b.scales[group] >> 6) << 4));
+    const int packed = b.qs[(lane / 64) * 32 + lane % 32];
+    const int q = group & 1 ? packed >> 4 : packed & 15;
+    return (__half2float(__ushort_as_half(b.d)) * scale) * q -
+           __half2float(__ushort_as_half(b.dmin)) * minimum;
+}
 __device__ float codebook_value(const float* p, size_t i) { return p[i]; }
 __device__ float codebook_value(const uint16_t* p, size_t i) { return f32_from_bf16(p[i]); }
 
@@ -124,8 +139,9 @@ __global__ void select_kernel(const int32_t* ids, const float* unary, const floa
 // Candidates are independent within a row. Keep each candidate's rank sum in
 // its original serial order, and let lane 0 retain the original tie handling
 // and confidence sum. Only the work between candidates is parallelized.
+template<class T>
 __global__ void select_bf16_parallel(const int32_t* ids, const float* unary, const float* hidden,
-                                    const uint16_t* prev, const uint16_t* next, const int32_t* anchor,
+                                    const T* prev, const T* next, const int32_t* anchor,
                                     int32_t* out, float* confidence, int rows, int top_k, int rank) {
     const int t = threadIdx.x;
     __shared__ float scores[64];
@@ -239,6 +255,19 @@ void dflash2_select_bf16(const int32_t* ids, const float* unary, const float* hi
         ids,unary,hidden,prev,next,anchor,out,confidence,rows,top_k,rank);
     else select_bf16_parallel<<<1, 64, 0, (cudaStream_t)stream>>>(
         ids,unary,hidden,prev,next,anchor,out,confidence,rows,top_k,rank);
+}
+void dflash2_select_q4_k(const int32_t* ids, const float* unary, const float* hidden,
+                         const void* prev, const void* next, const int32_t* anchor,
+                         int32_t* out, float* confidence, int rows, int top_k, int rank, void* stream, bool reference) {
+    if (!ids || !unary || !hidden || !prev || !next || !anchor || !out ||
+        rows < 2 || rows > 8 || top_k < 1 || top_k > 64 || rank < 256 || rank > 1024 || rank % 256)
+        throw std::invalid_argument("dflash2_select_q4_k: invalid geometry");
+    const auto* p = static_cast<const Q4KCodebookBlock*>(prev);
+    const auto* n = static_cast<const Q4KCodebookBlock*>(next);
+    if (reference) select_kernel<<<1, 1, 0, (cudaStream_t)stream>>>(
+        ids,unary,hidden,p,n,anchor,out,confidence,rows,top_k,rank);
+    else select_bf16_parallel<<<1, 64, 0, (cudaStream_t)stream>>>(
+        ids,unary,hidden,p,n,anchor,out,confidence,rows,top_k,rank);
 }
 namespace {
 __global__ void hc_mean_kernel(const float* residual, float* out, uint16_t* out_bf16,

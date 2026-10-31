@@ -364,7 +364,7 @@ bool DFlashDrafter::upload(const ModelGeometry& target_g, SessionState& ss, int 
             return bail(std::string("dflash: the weight upload of '") + t.name + "' failed: " +
                         cudaGetErrorString(cudaGetLastError()));
         }
-        if (t.type != 30) quant_types_.push_back({w_ + at / 2, t.type});
+        if (t.type != 30 && t.type != 0) quant_types_.push_back({w_ + at / 2, t.type});
         at += (t.bytes + 31) & ~size_t(31);
     }
     // The rms_norm gammas run as F32 device vectors (the kernel's contract); widen the small ones
@@ -382,8 +382,11 @@ bool DFlashDrafter::upload(const ModelGeometry& target_g, SessionState& ss, int 
         const uint16_t* host = (const uint16_t*) artifact_.host_data(t);
         std::vector<float> wide((size_t) t.rows * t.cols);
         for (int64_t i = 0; i < t.rows * t.cols; ++i) {
-            uint32_t bits = (uint32_t) host[i] << 16;
-            std::memcpy(&wide[(size_t) i], &bits, 4);
+            if (t.type == 0) std::memcpy(&wide[(size_t) i], artifact_.host_data(t) + i * 4, 4);
+            else {
+                uint32_t bits = (uint32_t) host[i] << 16;
+                std::memcpy(&wide[(size_t) i], &bits, 4);
+            }
         }
         wf_.push_back({t.name, f32d});
         if (cudaMemcpyAsync(f32d, wide.data(), wide.size() * 4, cudaMemcpyHostToDevice, cs_) != cudaSuccess)
@@ -1249,9 +1252,14 @@ bool DFlashDrafter::propose(int32_t x, int64_t pos, int block, int32_t* out, std
                         selector_unary_ + head_begin * dg.selector_top_k,
                         head_rows, vocab, (int) dg.selector_top_k, cs_, reference ? nullptr : selector_scratch_,
                         reference ? 0 : dflash2_topk_scratch_bytes((int) max_rows_, vocab, (int) dg.selector_top_k));
-            dflash2_select_bf16(selector_ids_, selector_unary_, selector_hidden_, wp("selector.predecessor"),
-                           wp("selector.successor"), tok_, out_, probs ? (float*) (out_ + max_rows_) : nullptr,
-                           K, (int) dg.selector_top_k, (int) dg.selector_rank, cs_, reference);
+            if (artifact_.tensor("selector.predecessor")->type == 12)
+                dflash2_select_q4_k(selector_ids_, selector_unary_, selector_hidden_, wp("selector.predecessor"),
+                               wp("selector.successor"), tok_, out_, probs ? (float*) (out_ + max_rows_) : nullptr,
+                               K, (int) dg.selector_top_k, (int) dg.selector_rank, cs_, reference);
+            else
+                dflash2_select_bf16(selector_ids_, selector_unary_, selector_hidden_, wp("selector.predecessor"),
+                               wp("selector.successor"), tok_, out_, probs ? (float*) (out_ + max_rows_) : nullptr,
+                               K, (int) dg.selector_top_k, (int) dg.selector_rank, cs_, reference);
             if (output_parity) {
                 parity_dump(parity_dir_, "selector_hidden", selector_hidden_, K * dg.selector_rank, cs_);
                 parity_dump(parity_dir_, "selector_ids", (const float*) selector_ids_, K * dg.selector_top_k, cs_);

@@ -2231,3 +2231,11 @@ if(STRATA_HIP_GFX906)
   add_executable(gfx906_qsa_query_swizzle_probe bench/gfx906_qsa_query_swizzle_probe.cpp)
   target_link_libraries(gfx906_qsa_query_swizzle_probe PRIVATE strata_kernels ${_strata_gpu_runtime_target})
 endif()
+
+# Local RTX 2080 official-Q4_K_M compatibility experiment; CUDA-only oracle.
+if(STRATA_ENABLE_CUDA AND STRATA_ENABLE_DFLASH2 AND STRATA_BUILD_TESTS AND STRATA_NATIVE_EXPERTS)
+  add_executable(dflash2_q4k_parity src/kernels/dflash2_q4k_parity.cpp)
+  target_link_libraries(dflash2_q4k_parity PRIVATE strata_kernels ggml-base ggml-cpu CUDA::cudart)
+  add_test(NAME dflash2_q4k_parity COMMAND dflash2_q4k_parity)
+  set_tests_properties(dflash2_q4k_parity PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
+endif()

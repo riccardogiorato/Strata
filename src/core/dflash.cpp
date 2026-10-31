@@ -116,10 +116,12 @@ bool DFlashArtifact::require(const char* canon, std::vector<const char*> aliases
         err += " in " + path_ + ")";
         return false;
     }
-    if (found->type != 30 && !(shape.size() == 2 && shape[0] % 32 == 0 &&
-                              (found->type == 2 || found->type == 6 || found->type == 8))) {
+    if (found->type != 30 && !(found->type == 0 && geom_.is_dflash2() && shape.size() != 2) &&
+        !(shape.size() == 2 && shape[0] % 32 == 0 &&
+          (found->type == 2 || found->type == 6 || found->type == 8 ||
+           ((found->type == 12 || found->type == 14) && shape[0] % 256 == 0)))) {
         err = std::string("dflash: tensor '") + found->name + "' is " + found->type_name() +
-              "; expected BF16 norms and BF16, Q8_0, Q5_0 or Q4_0 matrices";
+              "; expected F32/BF16 norms and BF16, Q8_0, Q5_0, Q4_0, Q4_K or Q6_K matrices";
         return false;
     }
     if (!shape_is(*found, shape)) {
@@ -462,8 +464,12 @@ bool DFlashArtifact::open(const std::string& path, std::string& err) {
             if (hf != llama) aliases.push_back(hf.c_str());
             if (bare != hf && bare != llama) aliases.push_back(bare.c_str());
             if (!require(canon.c_str(), aliases, shape, &t, err)) return false;
-            if (t.type != 30) {
-                err = "dflash2: extension tensors must be BF16 in the experimental runtime: " + t.file_name;
+            const bool codebook = canon == "selector.predecessor" || canon == "selector.successor";
+            const bool base = canon.ends_with(".base_kernel");
+            const bool quant_projection = !codebook && !base && shape.size() == 2 &&
+                (t.type == 12 || t.type == 14);
+            if (!(t.type == 30 || (base && t.type == 0) || (codebook && t.type == 12) || quant_projection)) {
+                err = "dflash2: unsupported extension tensor format: " + t.file_name;
                 return false;
             }
             add(0);
@@ -476,6 +482,9 @@ bool DFlashArtifact::open(const std::string& path, std::string& err) {
                    {rank, (uint64_t) g.vocab}) ||
             !extra("selector.hidden", "selector_hidden.weight", "candidate_selector.hidden_projection.weight",
                    {(uint64_t) H, rank})) return false;
+        if (tensor("selector.predecessor")->type != tensor("selector.successor")->type) {
+            err = "dflash2: selector codebooks must use the same format"; return false;
+        }
         for (int64_t l = 0; l < g.layers; ++l) {
             const auto pre = "layers." + std::to_string(l) + ".";
             const auto blk = "blk." + std::to_string(l) + ".";
