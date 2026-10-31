@@ -73,13 +73,14 @@ def telemetry(stop):
    row['gpu']=subprocess.check_output(['nvidia-smi','--query-gpu=utilization.gpu,power.draw,temperature.gpu,clocks.sm,memory.used','--format=csv,noheader'],text=True).strip()
    f.write(json.dumps(row)+'\n');f.flush();stop.wait(5)
 
-def run_task(label,arm,task,engine_log,prompt=None,resume=False,phase=None,max_output=32768):
+def run_task(label,arm,task,engine_log,prompt=None,resume=False,phase=None,max_output=32768,initial_files=None):
  dest=R/'runs'/label/(task+('-'+phase if phase else ''));dest.mkdir(parents=True,exist_ok=True)
  work=WORK/label/task;profile=P/'profiles'/label/task
  if not resume:
   assert not work.exists(),f'Preserve {work}'
   if (MASTER/task).exists():shutil.copytree(MASTER/task,work,symlinks=True)
   else:work.mkdir(parents=True)
+  for name,source in (initial_files or {}).items():shutil.copy2(source,work/name)
   shutil.copytree(P/arm,profile)
   if max_output!=32768:
    cp=profile/('models.json' if arm=='pi' else 'settings.json');cfg=json.loads(cp.read_text())
