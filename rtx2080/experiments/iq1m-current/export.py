@@ -1,5 +1,5 @@
 """Publish compact counters and checks, never raw prompts, replies or credentials."""
-import argparse, hashlib, json, statistics
+import argparse, json
 from pathlib import Path
 import campaign as c
 
@@ -21,7 +21,7 @@ out={'hardware':'RTX 2080 8GB, SM75, 165W; i5-9600K, 64GB RAM',
      'context_capacity':131072,'resident_kv_tokens':32768,'route_prior':1.5,
      'production_sha256':provenance['production_sha256'],
      'candidate_build':json.loads((c.R/'warp-build.json').read_text()),
-     'fixture_sha256':provenance['fixture_sha256'],
+     'fixture_sha256':provenance['fixture_sha256'],'arm_env_overrides':c.ARM_ENV,
      'long_prompt':s['long'],'host_load':s['host_load'],'agents':[], 'speed':[]}
 for row in s['agent']:
     if not row['tasks']:continue
