@@ -1087,8 +1087,24 @@ fallback. The existing `STRATA_PF_FUSED_NATIVE=0` override still disables it.
 
 Weights are represented exactly as small signed integers and a scale per 16 values, but the activations and intermediate
 values use the fused path's int8 rounding. Generated text can change. This does not guarantee a larger prompt chunk:
-the engine still reduces the requested chunk to fit its buffer budget. See the [RTX 2080 measurements](../bench/results/2026-10-29-sm75-iq1m-prefill/README.md)
+the engine still reduces the requested chunk to fit its buffer budget. See the [RTX 2080 measurements](../rtx2080/experiments/iq1m-current/README.md)
 for the measured speed, mixed short-prompt results, correctness checks and untested configurations.
+
+### FP16 grouped prompt tiles on a 64 KiB shared-memory device (opt-in)
+
+The existing `STRATA_PF_WMMA=1` path uses FP16 weights/activations and FP32 accumulation for grouped prompt experts.
+This fork adds a 64-weight-row tile for CUDA devices whose per-block shared-memory limit cannot fit the original
+128-row IQ tile (84,992 bytes). The smaller tile uses 51,200 bytes. Devices where the original tile fits retain it;
+Q2_0 and IQ4_NL-down retain their existing 52,224-byte tiles. Setup is checked and cached once per device.
+
+The narrow tile defaults to 256 threads. `STRATA_PF_WMMA_NT=512` selects sixteen 16x16 warp tiles instead of eight
+16x32 warp tiles, with the same shared allocation. This switch has no effect when the original wider tile fits.
+The usual fused path retains priority for formats it already covers. Both new settings are experimental;
+see the [current RTX 2080 campaign](../rtx2080/experiments/iq1m-current/README.md) for tested formats, model results
+and limitations. This is a CUDA implementation; no HIP or other-device validation is claimed.
+
+`STRATA_PF_FUSED_LEGACY_LAYOUT=1` is a separate diagnostic: retain the old ring/buffer layout while still permitting
+supported fused kernels. It isolates memory-planning effects from fused arithmetic and is off by default.
 
 ### The native Q2_0 pack's prompt experts on the fused int8 kernels (`STRATA_PF_FUSED_Q2N=1`, opt-in, sm_80+)
 

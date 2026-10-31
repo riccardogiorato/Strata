@@ -4,6 +4,8 @@ The current production settings are in [`../profile.json`](../profile.json). His
 
 Active research branches:
 
+- `experiment/iq1m-current`: [current-source IQ1_M / FP16 validation](iq1m-current/README.md), including rejected candidates and near-capacity tests.
+
 - `experiment/persistent-prefix-cache`: oMLX-inspired serialized prefix pages, measured restart/eviction gains, synchronous save costs; not production.
 - `experiment/iq1m-fused-prefill`: TensorFold-inspired IQ1_M adapter and upstream draft PR history; not production.
 
