@@ -13,5 +13,14 @@
     "experiment/persistent-prefix-cache",
     "experiment/iq1m-fused-prefill"
   ],
-  "benchmark_date": "2026-10-31"
+  "benchmark_date": "2026-10-31",
+  "consolidation": {
+    "date": "2026-10-31",
+    "retired_sibling_directories": 25,
+    "remaining_sibling_strata_directory": "strata",
+    "source_history_tags": 35,
+    "historical_campaigns": 41,
+    "post_cleanup_restart_and_chat_passed": true,
+    "native_binary_unchanged": true
+  }
 }

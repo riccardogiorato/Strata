@@ -7,6 +7,8 @@ Active research branches:
 - `experiment/persistent-prefix-cache`: oMLX-inspired serialized prefix pages, measured restart/eviction gains, synchronous save costs; not production.
 - `experiment/iq1m-fused-prefill`: TensorFold-inspired IQ1_M adapter and upstream draft PR history; not production.
 
+The earlier whole-session SSD proxy and its regression tests are preserved in [`snapshot-proxy/`](snapshot-proxy/README.md), alongside the newer native page-cache branch.
+
 Older source variants are Git tags under `archive/2026-10-31/`, indexed in `source-history.json`. Current speed checks: `python rtx2080/manage.py bench`. Full historical machine harnesses and raw evidence remain in the local runtime archive / original benchmark workspace; reports below are sanitized publication copies.
 
 | Campaign | Report | Measurements / patch |

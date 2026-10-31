@@ -1,3 +1,11 @@
+# RTX 2080 fork workflow
+
+- Read `rtx2080/README.md` first for this fork's current setup. The `rtx2080` branch is production; `rtx2080/profile.json` is the authoritative serving configuration.
+- Do not create version-numbered sibling Strata checkouts. Preserve alternatives in Git branches/tags and put disposable builds, local assets and credentials under ignored `runtime/` or `build/`.
+- Keep experimental cache/kernel branches separate from production unless the user requests promotion. Stop the serving unit before switching its checkout to a research branch, then return to `rtx2080` before restarting production.
+- Update the profile/current-state documentation when changing the deployed setup. Keep measured results, failed candidates and limitations distinct. Never commit runtime credentials, model weights or raw private conversations.
+- The inherited upstream instructions below still apply to upstream contributions. This fork's explicit user-selected model and profile take precedence over generic model recommendations.
+
 # AGENTS.md
 
 Version 0.2.9, engine 0.1.55. The public model families are DeepSeekV4.1-Flash-1017,
