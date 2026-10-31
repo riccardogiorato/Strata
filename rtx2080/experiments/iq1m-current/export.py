@@ -22,7 +22,8 @@ out={'hardware':'RTX 2080 8GB, SM75, 165W; i5-9600K, 64GB RAM',
      'production_sha256':provenance['production_sha256'],
      'candidate_build':json.loads((c.R/'warp-build.json').read_text()),
      'fixture_sha256':provenance['fixture_sha256'],'arm_env_overrides':c.ARM_ENV,
-     'long_prompt':s['long'],'host_load':s['host_load'],'agents':[], 'speed':[]}
+     'long_prompt':s['long'],'host_load':s['host_load'],'agents':[], 'speed':[],
+     'decisions':[r for line in (c.R/'results.jsonl').read_text().splitlines() if (r:=json.loads(line))['event']=='candidate_decision']}
 for row in s['agent']:
     if not row['tasks']:continue
     long=bool(row['long_checks'])
