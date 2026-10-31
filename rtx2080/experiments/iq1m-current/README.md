@@ -32,3 +32,9 @@ No production settings have changed. Chunk tuning, matched final controls and fu
 Automatic prefill (`auto:8192`, lend 100%) selected 4,352 tokens for FP16 and 4,608 for compact INT8. At 122,451 input tokens, FP16 measured 870.0 tok/s, FP16 with upstream embedding reuse accounting 860.1, INT8 with legacy layout 864.4, and compact INT8 888.3. All four exact edits passed. These are single screening runs, not paired final claims; the compact path's earlier failure remains part of its record.
 
 An opt-in `STRATA_PF_WMMA_NT=512` variant doubles the narrow tile's warps while retaining its 51,200-byte shared allocation and FP16 arithmetic. In the synthetic 693-row / seven-expert reference fixture, IQ1_M decreased from 0.4838 to 0.4169 ms per call (100 GPU-timed calls). Both thread layouts passed all eight numerical cases, including finite-output checks. This is a kernel microbenchmark, not an end-to-end speedup claim. Full-model and agent checks determine promotion.
+
+### Original 121K fixture: final cold/warm comparison
+
+The fresh-process order was production / FP16-512 / FP16-512 / production. Production read 121,016 tokens at 854.6 and 847.6 tok/s; the candidate at 860.1 and 857.4. Token/time aggregation gives 851.1 versus 858.7 tok/s (+0.9%). All four cold and all four warm retrieval answers passed. Mean host CPU use during these cold requests was around 18%, with no heavy rendering overlap observed in the telemetry.
+
+Every warm request reused 121,009 tokens (seven unread). Production warm first-token times were 1.056 and 0.938 seconds, versus 1.149 and 1.138 for the candidate. Treat those as cache/restore latency, not bulk prefill rates. Output lengths were 14–19 tokens, too short to use as a decode-performance claim. This is a small prefill gain and does not by itself justify promotion; coding-agent and usual speed checks are still in progress.
