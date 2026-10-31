@@ -13,6 +13,7 @@ ARM_ENV={
     'on':{'STRATA_PF_FUSED_IQ1_M':'1'},
     'legacy':{'STRATA_PF_FUSED_IQ1_M':'1','STRATA_PF_FUSED_LEGACY_LAYOUT':'1'},
     'fp16':{'STRATA_PF_FUSED_IQ1_M':'0','STRATA_PF_WMMA':'1'},
+    'fp16-emb':{'STRATA_PF_FUSED_IQ1_M':'0','STRATA_PF_WMMA':'1','STRATA_EMB_REUSE_ACCOUNT':'1'},
 }
 
 def dump(path,data):

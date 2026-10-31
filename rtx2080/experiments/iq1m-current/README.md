@@ -17,6 +17,12 @@ The adapter extends Strata's existing compressed-weight int8 fused prefill. Tens
 
 Scripts live here; raw inputs, outputs and configs stay under ignored `runtime/iq1m-20261031/`. `campaign.py` consumes a resolved production config and the archived edit/retrieval fixtures there. `harness.py` adapts our previously pinned Pi/fx benchmark harness; tasks and local harness executables come from the existing `local-ai-rtx2080` benchmark workspace. The shared proxy explicitly enables thinking despite Pi's local reasoning metadata.
 
-## Status
+## Implementation findings (validation still in progress)
 
-Build and validation in progress. No new performance or quality claim yet. No change to production settings.
+- The integrated INT8 adapter passes numerical tests, opt-out checks and CUDA memcheck. All 46 existing fused device functions retain identical assembly; one IQ1_M function is added.
+- In the first 122K series, installed production averaged 858.1 tok/s (2/2 exact edits), the rebuilt feature-off control 852.3 (2/2), and feature-on 881.2 (1/2). A rendering job overlapped portions of the series; final performance claims need clean confirmation. All outputs had 1,433 tokens. The failed edit missed two literal replacements.
+- `STRATA_PF_FUSED_LEGACY_LAYOUT=1` is a diagnostic added here: keep the old ring/buffer plan while using supported fused kernels. Two runs at 877.7 and 873.3 tok/s passed both edits. This does not establish general quality equivalence.
+- The existing FP16 grouped path (`STRATA_PF_WMMA=1`) failed to launch IQ tiles on the RTX 2080: its 84,992-byte shared-memory tile exceeds the 65,536-byte device limit. This campaign adds a 64-weight-row / 8-warp tile using 51,200 bytes, retaining FP16 weights/activations and FP32 sums. Devices where the original tile fits retain it; the already-fitting Q2_0/IQ4_NL-down tiles retain their shapes. Device attributes are initialized once per device.
+- Before that fix, the existing WMMA parity test failed to launch six of eight cases; afterwards all eight pass. CUDA memcheck reports zero errors. The first full-model FP16 run passed the edit at 875.9 tok/s.
+
+No production settings have changed. Chunk tuning, matched final controls and full agentic validation remain to be completed. The FP16 tile fix is an extension of upstream Strata's Volta kernel, separate from PR #4642's INT8 adapter. Neither is copied TensorFold code.
