@@ -1147,11 +1147,17 @@ uint64_t session_save_peak_bytes(const ConversationCheckpoint* deepest, const Se
 
 bool session_save_checkpoints(const std::vector<ConversationCheckpoint>& chain, const SessionSaveLive& live,
                               const std::function<bool(uint64_t need_bytes, std::string& why)>& admit,
-                              std::vector<ConversationCheckpoint>& out, std::string& why) {
+                              std::vector<ConversationCheckpoint>& out, std::string& why, bool preserve_all) {
     out.clear();
     const ConversationCheckpoint* deepest = session_deepest_checkpoint(chain);
-    if (admit && !admit(session_save_peak_bytes(deepest, live), why)) return false;
-    if (deepest) out.push_back(*deepest);
+    // Opt-in hybrid branch persistence: retain every available recurrent checkpoint.
+    // K/V is still streamed once. Account for BOTH checkpoint copies before allocating.
+    uint64_t need = session_save_peak_bytes(preserve_all ? nullptr : deepest, live);
+    if (preserve_all)
+        for (const auto& checkpoint : chain) need = sat_add(need, sat_mul(2, checkpoint.bytes()));
+    if (admit && !admit(need, why)) return false;
+    if (preserve_all) out = chain;
+    else if (deepest) out.push_back(*deepest);
     return true;
 }
 
