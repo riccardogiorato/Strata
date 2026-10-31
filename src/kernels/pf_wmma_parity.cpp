@@ -109,6 +109,19 @@ int run(int ty, int n_out, int K, std::mt19937& rng) {
         std::printf("%-8s %5d x %4d: not launched\n", name_of(ty), n_out, K);
         return 1;
     }
+    if (std::getenv("STRATA_WMMA_BENCH")) {
+        cudaEvent_t start, end;
+        ck(cudaEventCreate(&start), "timer start"); ck(cudaEventCreate(&end), "timer end");
+        for (int i = 0; i < 5; ++i)
+            k::gemm_iq_f16_grouped(ty, dw, eb, n_out, K, dx, K, db, E, maxr, dy, n_out, nullptr);
+        ck(cudaEventRecord(start), "timer record");
+        for (int i = 0; i < 100; ++i)
+            k::gemm_iq_f16_grouped(ty, dw, eb, n_out, K, dx, K, db, E, maxr, dy, n_out, nullptr);
+        ck(cudaEventRecord(end), "timer record"); ck(cudaEventSynchronize(end), "timer sync");
+        float ms = 0; ck(cudaEventElapsedTime(&ms, start, end), "timer elapsed");
+        std::printf("bench %-8s %d x %d: %.4f ms/call (100 calls)\n", name_of(ty), n_out, K, ms / 100);
+        cudaEventDestroy(start); cudaEventDestroy(end);
+    }
     for (int e = 0; e < E; ++e) k::iq_dequant_f16(ty, dw + e * eb, (int64_t) n_out * K, dq + (size_t) e * n_out * K, nullptr);
     ck(cudaDeviceSynchronize(), "run");
     std::vector<float> y((size_t) total * n_out);
@@ -116,6 +129,7 @@ int run(int ty, int n_out, int K, std::mt19937& rng) {
     ck(cudaMemcpy(y.data(), dy, y.size() * 4, cudaMemcpyDeviceToHost), "y");
     ck(cudaMemcpy(q.data(), dq, q.size() * 2, cudaMemcpyDeviceToHost), "dq");
     double worst = 0, scale = 0;
+    bool finite = true;
     for (int e = 0; e < E; ++e)
         for (int r = bounds[e]; r < bounds[e + 1]; ++r)
             for (int n = 0; n < n_out; ++n) {
@@ -125,10 +139,11 @@ int run(int ty, int n_out, int K, std::mt19937& rng) {
                     __half h; std::memcpy(&h, &wr[kk], 2);
                     s += (double) __half2float(h) * (double) __half2float(x[(size_t) r * K + kk]);
                 }
+                finite = finite && std::isfinite(s) && std::isfinite(y[(size_t) r * n_out + n]);
                 scale = std::max(scale, std::fabs(s));
                 worst = std::max(worst, std::fabs(s - (double) y[(size_t) r * n_out + n]));
             }
-    const bool ok = worst <= 2e-3 * scale + 1e-6;
+    const bool ok = finite && worst <= 2e-3 * scale + 1e-6;
     std::printf("%-8s %5d x %4d, %d rows in %d experts: max |err| %.3g of max |ref| %.3g  %s\n", name_of(ty), n_out, K,
                 total - base, E, worst, scale, ok ? "ok" : "FAIL");
     cudaFree(dw); cudaFree(dx); cudaFree(db); cudaFree(dy); cudaFree(dq);

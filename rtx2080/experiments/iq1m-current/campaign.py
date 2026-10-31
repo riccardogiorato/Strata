@@ -111,6 +111,7 @@ def needle(label,**meta):
         except Exception:ok=False
         record(event='needle_correctness',label=label+'-'+phase,passed=ok,**meta)
         assert 115000<row['usage']['prompt_tokens']<125000
+        if phase=='cold':assert row['timings']['cache_n']==0
 
 def speed(label):
     with (R/(label+'.runner.log')).open('w') as log:
