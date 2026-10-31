@@ -51,7 +51,10 @@ def server(label,arm,chunk='4096',route='1.5',extra=None):
                 except Exception:pass
                 if time.monotonic()-start>600:raise TimeoutError(label+' boot')
                 time.sleep(1)
-            record(event='boot',label=label,arm=arm,seconds=time.monotonic()-start)
+            record(event='boot',label=label,arm=arm,seconds=time.monotonic()-start,
+                   binary_sha256=hashlib.sha256(Path(cfg['exe']).read_bytes()).hexdigest(),
+                   source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
+                   chunk=chunk,extra_env=extra or {})
             yield cfg
         finally:stop(proc)
 
