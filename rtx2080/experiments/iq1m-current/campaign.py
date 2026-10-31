@@ -68,7 +68,7 @@ def server(label,arm,chunk='4096',route='1.5',extra=None):
         finally:stop(proc)
 
 def sample(label,body,**meta):
-    status(phase='request',label=label,**meta)
+    status(phase='request',label=label,request_phase=meta.get('phase'),**{k:v for k,v in meta.items() if k!='phase'})
     body=copy.deepcopy(body);body.update(stream=True,stream_options={'include_usage':True})
     req=urllib.request.Request(f'http://127.0.0.1:{PORT}/v1/chat/completions',data=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
     start=time.monotonic();first=None;chunks=[];usage={};timings={};content='';reasoning='';finish=None
