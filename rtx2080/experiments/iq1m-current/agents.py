@@ -29,12 +29,13 @@ def main():
                         first=h.run_task(label,'pi',task,c.R/(label+'.engine.log'),prompt=prompt,phase='initial',max_output=8192,initial_files={'branch_cache.py':c.R/'fixtures/original.py.txt'})
                         work=h.WORK/label/task;profile=h.P/'profiles'/label/task
                         import subprocess
-                        def verify(value):
+                        def verify(value, result):
                             x=subprocess.run(h.sandbox(work,'pi',profile)+['python3','-c',f'import ast; from pathlib import Path; import cached_value; assert cached_value.cached_value() == {value}; assert ast.dump(ast.parse(Path("branch_cache.py").read_text())) == '+repr(ast.dump(ast.parse((c.R/'fixtures/expected.py.txt').read_text())))],capture_output=True,text=True,timeout=30)
-                            return {'passed':x.returncode==0,'stderr':x.stderr}
-                        c.dump(c.R/'runs'/label/'long-initial-check.json',verify(73491))
-                        h.run_task(label,'pi',task,c.R/(label+'.engine.log'),prompt='Update cached_value() to return the same value plus 9. Add a docstring. Verify the new result with Python. Do not restate the archive.',resume=True,phase='followup',max_output=8192)
-                        c.dump(c.R/'runs'/label/'long-followup-check.json',verify(73500))
+                            clean=result['exit']==0 and not result['errors'] and result['tool_calls']>0
+                            return {'passed':x.returncode==0 and clean,'file_check_passed':x.returncode==0,'agent_exit':result['exit'],'agent_errors':result['errors'],'tool_calls':result['tool_calls'],'stderr':x.stderr}
+                        c.dump(c.R/'runs'/label/'long-initial-check.json',verify(73491,first))
+                        second=h.run_task(label,'pi',task,c.R/(label+'.engine.log'),prompt='Update cached_value() to return the same value plus 9. Add a docstring. Verify the new result with Python. Do not restate the archive.',resume=True,phase='followup',max_output=8192)
+                        c.dump(c.R/'runs'/label/'long-followup-check.json',verify(73500,second))
                     finally:settings.write_text(old)
                 else:
                     for task in h.TASKS:
