@@ -60,3 +60,19 @@ The final driver checks that the production binary, profile, source record and e
 The historical 590 → 886 tok/s improvement came from the existing fused-prefill / batch / VRAM-loan bundle on the Swift weights. It did not come from this IQ1_M adapter. Forty-five of the model's 48 layers already use the existing fused native-IQ path for large prompt chunks; this investigation primarily targets the three IQ1_M fallback layers. An isolated kernel improvement therefore cannot be applied as the same percentage to whole-model prefill.
 
 The repaired FP16 path dequantizes compressed weights into shared-memory tiles and multiplies FP16 activations with FP32 accumulation. It extends Strata's existing Volta implementation to the 2080's shared-memory limit. This follows the tiled, on-the-fly dequantization direction investigated from TensorFold, but contains no copied TensorFold code. The existing `STRATA_PF_WMMA` switch is broader than IQ1_M: on smaller non-fused prompt chunks it can also select FP16 grouped multiplication for other supported formats. Short-prompt and cached-agent checks are needed for that reason.
+
+### FP16 candidate disposition
+
+The ordinary speed suite completed without failures or skipped tests. Token-weighted results:
+
+| Workload | Production | FP16-512 | Change |
+|---|---:|---:|---:|
+| Chat decode | 57.44 | 57.70 | +0.5% |
+| 4K prefill | 657.85 | 654.72 | −0.5% |
+| 16K prefill | 866.48 | 867.14 | +0.1% |
+| 32K prefill | 881.31 | 883.51 | +0.2% |
+| 121K prefill | 851.1 | 858.7 | +0.9% |
+
+Both near-capacity Pi sessions and their follow-ups passed on both arms (4/4 independent checks per arm, thinking enabled). Across these sessions production generated 5,062 tokens at 63.74 tok/s; FP16 generated 6,127 at 61.84 tok/s. The tool paths and output text differ, so the decode difference is observational, not an isolated decode-kernel result. All native counters matched API usage. Context reached 121,831 tokens on production and 123,720 on FP16.
+
+The FP16 repair is retained as experimental code, not promoted: the isolated kernel improvement did not produce a useful overall model speedup. The planned ordinary scored suites were not launched for this rejected candidate. The final remaining candidate is the original INT8 adapter with the old ring/buffer layout; it passed three exact-edit screens and is being compared on the original 121K fixture before any further coding validation.

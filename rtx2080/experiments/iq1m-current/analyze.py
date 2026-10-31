@@ -15,7 +15,7 @@ for line in (c.R/'telemetry.jsonl').read_text().splitlines():
     except (ValueError,KeyError):pass
 telemetry.sort()
 for r in rows:
-    if r['event']!='request' or not r['label'].startswith('final-') or r.get('phase')!='cold':continue
+    if r['event']!='request' or not r['label'].startswith(('final-','legacyfinal-')) or r.get('phase')!='cold':continue
     samples=[x for x in telemetry if r['at']-r['wall_s']<=x[0]<=r['at']]
     busy=[100*(1-(b[2]-a[2])/(b[1]-a[1])) for a,b in zip(samples,samples[1:]) if b[1]>a[1]]
     summary['host_load'].append({'label':r['label'],'samples':len(busy),'mean_cpu_busy_pct':statistics.mean(busy) if busy else None,'peak_cpu_busy_pct':max(busy,default=None)})
