@@ -38,3 +38,19 @@ An opt-in `STRATA_PF_WMMA_NT=512` variant doubles the narrow tile's warps while 
 The fresh-process order was production / FP16-512 / FP16-512 / production. Production read 121,016 tokens at 854.6 and 847.6 tok/s; the candidate at 860.1 and 857.4. Token/time aggregation gives 851.1 versus 858.7 tok/s (+0.9%). All four cold and all four warm retrieval answers passed. Mean host CPU use during these cold requests was around 18%, with no heavy rendering overlap observed in the telemetry.
 
 Every warm request reused 121,009 tokens (seven unread). Production warm first-token times were 1.056 and 0.938 seconds, versus 1.149 and 1.138 for the candidate. Treat those as cache/restore latency, not bulk prefill rates. Output lengths were 14–19 tokens, too short to use as a decode-performance claim. This is a small prefill gain and does not by itself justify promotion; coding-agent and usual speed checks are still in progress.
+
+## Reproduction on this prepared workspace
+
+Use `runtime/venv/bin/python` and the fixture/config preparation described above. All commands below retain production assets; stop the production service before allocating the GPU.
+
+```sh
+cmake --build build/iq1m-current --target strata prefill_fused_iq_test pf_wmma_parity -j2
+STRATA_WMMA_BENCH=1 STRATA_PF_WMMA_NT=256 build/iq1m-current/pf_wmma_parity
+STRATA_WMMA_BENCH=1 STRATA_PF_WMMA_NT=512 build/iq1m-current/pf_wmma_parity
+STRATA_PF_WMMA_NT=512 compute-sanitizer --tool memcheck --error-exitcode 99 build/iq1m-current/pf_wmma_parity
+runtime/venv/bin/python rtx2080/experiments/iq1m-current/final.py fp16-512
+runtime/venv/bin/python rtx2080/experiments/iq1m-current/analyze.py
+runtime/venv/bin/python rtx2080/experiments/iq1m-current/export.py
+```
+
+The final driver checks that the production binary, profile, source record and expert-profile seed remain unchanged, and that the candidate binary does not change during validation. It runs each arm in a fresh engine, with a copied expert-profile seed and a quiet-host check before each stage. Completed arm labels are skipped on restart; use new prefixes for intentional repeats. Near-capacity follow-up requests count as continuations in the aggregate cache metrics, including the first request after resuming the Pi session. Their file checks are separate from the ordinary ten-task verifier.
