@@ -297,6 +297,14 @@ int64_t g_ring_small_max = 0;
 // take any of its layers: IQ2_XS, 4K / 32K, their first version at 384 slots -3% / -6% against MMQ, at 512 +8% / 0%.
 inline bool fused_ring() {
     if (core::peer_portable()) return false;   // multi-GPU: --peer-device keeps the MMQ path and its buffer sizes
+    // Diagnostic: retain the unfused ring/buffer plan while still dispatching supported fused kernels.
+    // This separates arithmetic changes from the planner response when the last fallback format is covered.
+    // The larger legacy buffers accommodate both paths; never force the compact layout onto an unsupported layer.
+    static const bool legacy_layout = [] {
+        const char* v = std::getenv("STRATA_PF_FUSED_LEGACY_LAYOUT");
+        return v != nullptr && v[0] == '1';
+    }();
+    if (legacy_layout) return false;
     const strata::kernels::cpu::ExpertLayout& lay = strata::kernels::cpu::expert_layout();
     // the Q2_0 pack: fused::enabled().  A native pack: native_supported() alone - it implies enabled() wherever the Q2_0
     // kernels exist, and on gfx12 (the native kernels only) enabled() is false while the native layers do run fused.

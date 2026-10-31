@@ -1,6 +1,6 @@
 """Wait for a quiet host before the measured campaign; never stop unrelated work."""
 from pathlib import Path
-import subprocess, threading, time
+import subprocess, threading, time, sys
 import campaign as c
 import harness as h
 
@@ -14,6 +14,7 @@ while quiet<3:
 c.record(event='quiet_host',samples=3,threshold=.20)
 stop=threading.Event();threading.Thread(target=h.telemetry,args=(stop,),daemon=True).start()
 try:
-    cmd=[str(c.PYTHON),str(Path(__file__).with_name('campaign.py')),'edit','prod','off','on','on','off','prod','--prefix','fixed']
+    args=sys.argv[1:] or ['campaign.py','edit','prod','off','on','on','off','prod','--prefix','fixed']
+    cmd=[str(c.PYTHON),str(Path(__file__).with_name(args[0])),*args[1:]]
     subprocess.run(cmd,check=True)
 finally:stop.set()
