@@ -1,0 +1,429 @@
+[
+  {
+    "source": "strata",
+    "base": "8117643ccc68e3d08f80d38e064333742d4474bb",
+    "preserved": "8117643ccc68e3d08f80d38e064333742d4474bb",
+    "tag": "archive/2026-10-31/strata",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0138",
+    "base": "99f3dbd0b21d1401b3769e0c0d963913607f380b",
+    "preserved": "99f3dbd0b21d1401b3769e0c0d963913607f380b",
+    "tag": "archive/2026-10-31/strata-0138",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0139",
+    "base": "6f32ec070f23ced9f50e704d854d775da52591ab",
+    "preserved": "6f32ec070f23ced9f50e704d854d775da52591ab",
+    "tag": "archive/2026-10-31/strata-0139",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0140",
+    "base": "82f46a8c8f475f001ad76d92f58f4a4f8ffb0253",
+    "preserved": "82f46a8c8f475f001ad76d92f58f4a4f8ffb0253",
+    "tag": "archive/2026-10-31/strata-0140",
+    "changed_files": []
+  },
+  {
+    "source": "strata-01402",
+    "base": "e8ca9afd03d839d4f8dbbe82dffce7f8a3bafd7a",
+    "preserved": "e8ca9afd03d839d4f8dbbe82dffce7f8a3bafd7a",
+    "tag": "archive/2026-10-31/strata-01402",
+    "changed_files": []
+  },
+  {
+    "source": "strata-01403",
+    "base": "d5ea7133741e67743c0e886bb426c0ce8d69cf6c",
+    "preserved": "d5ea7133741e67743c0e886bb426c0ce8d69cf6c",
+    "tag": "archive/2026-10-31/strata-01403",
+    "changed_files": []
+  },
+  {
+    "source": "strata-01404",
+    "base": "6674a0065fb96bacde33e3eb10f91a1df86f95f2",
+    "preserved": "6674a0065fb96bacde33e3eb10f91a1df86f95f2",
+    "tag": "archive/2026-10-31/strata-01404",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0141",
+    "base": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
+    "preserved": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
+    "tag": "archive/2026-10-31/strata-0141",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0142",
+    "base": "61b3fb5dd3f1e8ec09cf7e4e05208bc6d3c46406",
+    "preserved": "61b3fb5dd3f1e8ec09cf7e4e05208bc6d3c46406",
+    "tag": "archive/2026-10-31/strata-0142",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0143",
+    "base": "7695859aa13afb248bdb4d36f9b2e95707db079d",
+    "preserved": "7695859aa13afb248bdb4d36f9b2e95707db079d",
+    "tag": "archive/2026-10-31/strata-0143",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0144",
+    "base": "ed4773eb7c8f1f1531ba2bc70e0e1987de2661af",
+    "preserved": "ed4773eb7c8f1f1531ba2bc70e0e1987de2661af",
+    "tag": "archive/2026-10-31/strata-0144",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0145",
+    "base": "477ac13cbe8e582c20484871ce459d20d82df09d",
+    "preserved": "4248355ce02a96319be67a9909e4f95c78203807",
+    "tag": "archive/2026-10-31/strata-0145",
+    "changed_files": [
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp"
+    ]
+  },
+  {
+    "source": "strata-020-beta",
+    "base": "3d1fb48090e8f2cefc22d7b5845fb7f5b71f33fa",
+    "preserved": "362668bc84bdda22dd6ada57439ea743ace8ef8f",
+    "tag": "archive/2026-10-31/strata-020-beta",
+    "changed_files": [
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp"
+    ]
+  },
+  {
+    "source": "strata-021",
+    "base": "90767252f420e25223c739d604145ad15911d48b",
+    "preserved": "40d077bd4964a99bcffd836732080381997c0949",
+    "tag": "archive/2026-10-31/strata-021",
+    "changed_files": [
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp"
+    ]
+  },
+  {
+    "source": "strata-022",
+    "base": "011c9e600a93bbc9fd451c563501b5831c32bbca",
+    "preserved": "96bcbbca75053c8b95f83e48dc6f742396330571",
+    "tag": "archive/2026-10-31/strata-022",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "docs/VRAM_ELASTIC.md",
+      "include/strata/core/mtp.hpp",
+      "include/strata/core/native_head.hpp",
+      "include/strata/core/verify.hpp",
+      "src/core/mtp.cpp",
+      "src/core/native_head.cpp",
+      "src/core/verify.cpp",
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp",
+      "src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-023",
+    "base": "5c8dd322528cc84f68f461ad54a506b9da8fa8d4",
+    "preserved": "33b878c26fef81238cbee3de289c50455b16b984",
+    "tag": "archive/2026-10-31/strata-023",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "docs/VRAM_ELASTIC.md",
+      "include/strata/core/conversation_file.hpp",
+      "include/strata/core/mtp.hpp",
+      "include/strata/core/native_head.hpp",
+      "include/strata/core/session_restore_hot.hpp",
+      "include/strata/core/verify.hpp",
+      "serve/server.py",
+      "serve/test_server.py",
+      "src/core/conversation_file.cpp",
+      "src/core/conversation_file_test.cpp",
+      "src/core/mtp.cpp",
+      "src/core/native_head.cpp",
+      "src/core/verify.cpp",
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp",
+      "src/prefill/moe_fused_iq.cu",
+      "src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-024",
+    "base": "96ca4383c7b05a8a3e6064c65d9e9977d4b3bb59",
+    "preserved": "96ca4383c7b05a8a3e6064c65d9e9977d4b3bb59",
+    "tag": "archive/2026-10-31/strata-024",
+    "changed_files": []
+  },
+  {
+    "source": "strata-0242",
+    "base": "dfa3f4025c9f1bc4af8cee201b20a2d223061813",
+    "preserved": "e59c129ab4cd95bcdfaba74513e3cef3d2ca550b",
+    "tag": "archive/2026-10-31/strata-0242",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "docs/VRAM_ELASTIC.md",
+      "include/strata/core/mtp.hpp",
+      "include/strata/core/native_head.hpp",
+      "include/strata/core/verify.hpp",
+      "serve/server.py",
+      "serve/test_server.py",
+      "src/core/mtp.cpp",
+      "src/core/native_head.cpp",
+      "src/core/verify.cpp",
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp",
+      "src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-026",
+    "base": "4b9e05a2a806a3fe24f7b2560d98626c37dade35",
+    "preserved": "1a655ea681db5152b1500733fb0da1ca56c37446",
+    "tag": "archive/2026-10-31/strata-026",
+    "changed_files": [
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp"
+    ]
+  },
+  {
+    "source": "strata-027",
+    "base": "5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d",
+    "preserved": "3d3de66fcf875449f54ba716dab1c6ba8889c1cf",
+    "tag": "archive/2026-10-31/strata-027",
+    "changed_files": [
+      "docs/VRAM_ELASTIC.md",
+      "include/strata/core/conversation_file.hpp",
+      "include/strata/core/mtp.hpp",
+      "include/strata/core/native_head.hpp",
+      "include/strata/core/verify.hpp",
+      "serve/server.py",
+      "serve/test_server.py",
+      "src/core/conversation_file.cpp",
+      "src/core/conversation_file_test.cpp",
+      "src/core/mtp.cpp",
+      "src/core/native_head.cpp",
+      "src/core/verify.cpp",
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp",
+      "src/prefill/moe_fused_iq.cu",
+      "src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-028-custom",
+    "base": "6cb7e0910a9552b748e6c743dcd18b8e3a079728",
+    "preserved": "6cb7e0910a9552b748e6c743dcd18b8e3a079728",
+    "tag": "archive/2026-10-31/strata-028-custom",
+    "changed_files": []
+  },
+  {
+    "source": "strata-029-custom",
+    "base": "0fded4a0a319cea9a4036adb4c50bbfe456fc159",
+    "preserved": "0fded4a0a319cea9a4036adb4c50bbfe456fc159",
+    "tag": "archive/2026-10-31/strata-029-custom",
+    "changed_files": []
+  },
+  {
+    "source": "strata-dflash2-2080",
+    "base": "2103f3e4b7fc56cfa3231ecc001ebe0a931a7db9",
+    "preserved": "6721576748b3f174b77516529b22d2bdd617b9c6",
+    "tag": "archive/2026-10-31/strata-dflash2-2080",
+    "changed_files": [
+      "CMakeLists.txt",
+      "include/strata/kernels/dflash2.hpp",
+      "src/core/dflash.cpp",
+      "src/core/dflash_runtime.cpp",
+      "src/kernels/cuda/dflash2.cu",
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/dflash2_q4k_parity.cpp",
+      "src/kernels/qsa_select_bench.cpp"
+    ]
+  },
+  {
+    "source": "strata-optimization-ab-20261021",
+    "base": "90767252f420e25223c739d604145ad15911d48b",
+    "preserved": "dd6c99bc6f6e6e57b0ae2314e18c81204e38eaaf",
+    "tag": "archive/2026-10-31/strata-optimization-ab-20261021",
+    "changed_files": [
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp"
+    ]
+  },
+  {
+    "source": "strata-port",
+    "base": "61b3fb5dd3f1e8ec09cf7e4e05208bc6d3c46406",
+    "preserved": "61b3fb5dd3f1e8ec09cf7e4e05208bc6d3c46406",
+    "tag": "archive/2026-10-31/strata-port",
+    "changed_files": []
+  },
+  {
+    "source": "strata-pr-campaign-20261027-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "f7c9b6a4819f6d937e49bacc5892cdbe1c302e8a",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-source",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "include/strata/core/token_mask.hpp",
+      "include/strata/core/verify.hpp",
+      "requirements.txt",
+      "serve/constrain.py",
+      "serve/fake_mask_engine.py",
+      "serve/server.py",
+      "serve/test_constrain.py",
+      "setup.py",
+      "src/core/verify.cpp",
+      "src/program/generate.cpp",
+      "sycl/include/strata/core/verify.hpp",
+      "sycl/src/core/verify.cpp",
+      "sycl/src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-pr-campaign-20261027-reuse-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "7a582b7b8fa5b71b76aa3052b11d1338baef2bb1",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-reuse-source",
+    "changed_files": [
+      "serve/server.py",
+      "serve/test_prompt_encoder.py",
+      "serve/test_server.py",
+      "tools/strata_tokenizer.py"
+    ]
+  },
+  {
+    "source": "strata-pr-campaign-20261027-scratch-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "632821a78d50323af657877351b7a7b864ad3250",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-scratch-source",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "src/prefill/prefill.cpp"
+    ]
+  },
+  {
+    "source": "strata-pr-campaign-20261027-park-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "ababd2d91dd7163fe9d83ccada571f82c59cbefa",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-park-source",
+    "changed_files": [
+      "include/strata/core/conversation_cache.hpp",
+      "include/strata/core/conversation_snapshot.hpp",
+      "src/core/conversation_cache_test.cpp",
+      "src/core/conversation_copy.hpp",
+      "src/core/conversation_state.cpp",
+      "src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-pr-campaign-20261027-dedup-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "a079728cf4025279fd8ec0c4bdc11a045ddafa65",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-dedup-source",
+    "changed_files": [
+      "CMakeLists.txt",
+      "docs/PARKED_CACHE_DEDUP.md",
+      "include/strata/core/conversation_buffer.hpp",
+      "include/strata/core/conversation_cache.hpp",
+      "include/strata/core/conversation_snapshot.hpp",
+      "include/strata/core/conversation_storage.hpp",
+      "include/strata/core/session_save_reclaim.hpp",
+      "serve/server.py",
+      "src/core/conversation_copy.hpp",
+      "src/core/conversation_file.cpp",
+      "src/core/conversation_snapshot.cpp",
+      "src/core/conversation_snapshot_test.cpp",
+      "src/core/conversation_state.cpp",
+      "src/core/conversation_validation_test.cpp",
+      "src/program/generate.cpp",
+      "tests/core/conversation_storage_test.cpp"
+    ]
+  },
+  {
+    "source": "strata-pr-campaign-20261027-grammar-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "af8d6a6e4d7415ff49aa4edc7a3d746b29fcd288",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-grammar-source",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "include/strata/core/token_mask.hpp",
+      "include/strata/core/verify.hpp",
+      "requirements.txt",
+      "serve/constrain.py",
+      "serve/fake_mask_engine.py",
+      "serve/server.py",
+      "serve/test_constrain.py",
+      "setup.py",
+      "src/core/verify.cpp",
+      "src/program/generate.cpp",
+      "sycl/include/strata/core/verify.hpp",
+      "sycl/src/core/verify.cpp",
+      "sycl/src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-pr-campaign-20261027-winner-source",
+    "base": "e63ff30633b0449db1eb4aab013da31f8a7b3a96",
+    "preserved": "36b4aca55d9841f456f53b0b6e8ff34fbde4ebe2",
+    "tag": "archive/2026-10-31/strata-pr-campaign-20261027-winner-source",
+    "changed_files": [
+      "docs/DETAILS.md",
+      "include/strata/core/conversation_cache.hpp",
+      "include/strata/core/conversation_snapshot.hpp",
+      "include/strata/core/mtp.hpp",
+      "include/strata/core/verify.hpp",
+      "include/strata/kernels/verify_kernels.hpp",
+      "include/strata/spec/draft_policy.hpp",
+      "src/core/conversation_cache_test.cpp",
+      "src/core/conversation_copy.hpp",
+      "src/core/conversation_state.cpp",
+      "src/core/mtp.cpp",
+      "src/core/verify.cpp",
+      "src/kernels/cuda/verify_kernels.cu",
+      "src/program/generate.cpp",
+      "src/spec/draft_policy.cpp",
+      "src/spec/draft_policy_test.cpp"
+    ]
+  },
+  {
+    "source": "strata-027-routing-20261027-source",
+    "base": "5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d",
+    "preserved": "266268fc94760a2d0097447e7e443c25cf158e28",
+    "tag": "archive/2026-10-31/strata-027-routing-20261027-source",
+    "changed_files": [
+      "docs/VRAM_ELASTIC.md",
+      "include/strata/core/conversation_file.hpp",
+      "include/strata/core/mtp.hpp",
+      "include/strata/core/native_head.hpp",
+      "include/strata/core/verify.hpp",
+      "serve/server.py",
+      "serve/test_server.py",
+      "src/core/conversation_file.cpp",
+      "src/core/conversation_file_test.cpp",
+      "src/core/mtp.cpp",
+      "src/core/native_head.cpp",
+      "src/core/verify.cpp",
+      "src/kernels/cuda/qsa_select.cu",
+      "src/kernels/qsa_select_bench.cpp",
+      "src/prefill/moe_fused_iq.cu",
+      "src/program/generate.cpp"
+    ]
+  },
+  {
+    "source": "strata-iq1-prefill-20261029-upstream",
+    "base": "770cba2bc38d62047139cc4e506d2a3148c07a95",
+    "preserved": "770cba2bc38d62047139cc4e506d2a3148c07a95",
+    "tag": "archive/2026-10-31/strata-iq1-prefill-20261029-upstream",
+    "changed_files": []
+  },
+  {
+    "source": "strata-paged-cache-20261029-source",
+    "base": "eaa132d2c378a985e55c946578c4a6b821f23e52",
+    "preserved": "eaa132d2c378a985e55c946578c4a6b821f23e52",
+    "tag": "archive/2026-10-31/strata-paged-cache-20261029-source",
+    "changed_files": []
+  }
+]

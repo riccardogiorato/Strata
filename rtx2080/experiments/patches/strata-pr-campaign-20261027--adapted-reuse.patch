@@ -1,0 +1,300 @@
+diff --git i/serve/server.py w/serve/server.py
+index 6e34df2..230dc36 100644
+--- i/serve/server.py
++++ w/serve/server.py
+@@ -200,6 +200,8 @@ VISION_START = "<|vision_start|>"
+ # broken state that answers one token forever (an issue saw 36,689 tokens of "!"). The config's "repeat_stop_tokens"
+ # sets it; 0 turns it off.
+ REPEAT_STOP_TOKENS = 256
++REPLY_REUSE = os.environ.get("STRATA_REPLY_REUSE", "") == "1"
++BUDGET_REUSE = os.environ.get("STRATA_BUDGET_REUSE", "") == "1"
+ ANSWER_ROOM_MIN_CAP = 1024    # 0.1.45: from this max_tokens on, thinking without a budget is closed early enough to leave room to answer
+ ANSWER_RESERVE_MIN = 512      # #984: the tokens kept for the answer when a thinking budget is cut down to fit max_tokens
+ # #123: what closes the thinking when it reaches reasoning_budget_tokens (the model's own end-of-thinking tag after it)
+@@ -2188,6 +2190,9 @@ class StrataEngine:
+         if not self.alive():
+             raise EngineDied("the engine is unavailable; this request was not sent")
+         bias_api.validate_request(sampling or {}, self, None)
++        # the tokens the engine generated after the consumer stopped reading (read while draining to DONE below): the
++        # engine stops between verify windows, so its state can hold a few tokens past the consumer's cut
++        self.overrun = []
+         if getattr(self, "batch", 0):
+             yield from self.generate_batched(ids, max_new, sampling, cancel, embeddings)
+             return
+@@ -2301,6 +2306,8 @@ class StrataEngine:
+                     if line.startswith("DONE"):
+                         self._parse_done(line)
+                         break
++                    if line.startswith("T ") and line[2:].strip().isdigit():
++                        self.overrun.append(int(line[2:]))
+                     if not self.can_stop:
+                         heard = time.monotonic()
+ 
+@@ -5375,12 +5382,24 @@ class Service:
+                             text = "\n" * (2 - (len(tail) - len(tail.rstrip("\n")))) + force
+                         force = None
+                         extra = self.tok.encode(text, parse_special=True)
+-                        if max_new - n - len(extra) < 1:
++                        # The engine stops between its verify windows, so it may already hold a few thinking tokens
++                        # past the budget that this pass did not read.  The next prompt carries them too, so it extends
++                        # the engine's state instead of diverging from it (which re-read the whole thinking from the
++                        # prompt's checkpoint).  Not when they could end the thinking or hold part of a tag or character,
++                        # nor when they would take the room an answer still has.
++                        over = list(getattr(self.engine, "overrun", None) or []) if wrap and BUDGET_REUSE else []
++                        if over and (any(t in self.stop_ids for t in over) or
++                                     any(c in self.tok.decode(over) for c in "<�") or
++                                     max_new - n - len(over) - len(extra) < 1):
++                            over = []
++                        if max_new - n - len(over) - len(extra) < 1:
+                             break                       # no room left to answer: "length", as without a budget
+                         if wrap:
+-                            print(f"[strata] thinking budget reached ({thought} tokens): wrapping up the thinking",
++                            print(f"[strata] thinking budget reached ({thought} tokens"
++                                  f"{f', {len(over)} more in flight' if over else ''}): wrapping up the thinking",
+                                   flush=True)
+-                        for t in extra:
++                        seg = seg + over
++                        for t in over + extra:
+                             n += 1
+                             raw_ids.append(t)
+                             thinking_n += parser.state in ("reasoning", "rcall")
+@@ -5392,6 +5411,9 @@ class Service:
+                             finish = "stop"
+                             break
+                         prompt = prompt + seg + extra
++                    if REPLY_REUSE and self.prompts is not None and raw_ids and not emb and not recovery_count:
++                        with contextlib.suppress(Exception):
++                            self.prompts.remember_reply(ids, raw_ids)
+                     if cancel.is_set():
+                         finish = "cancel"
+                     elif looped:
+diff --git i/serve/test_prompt_encoder.py w/serve/test_prompt_encoder.py
+index 897ddd6..55c9a29 100644
+--- i/serve/test_prompt_encoder.py
++++ w/serve/test_prompt_encoder.py
+@@ -159,5 +159,69 @@ class Served(unittest.TestCase):
+         self.assertGreater(reused, 1000)
+ 
+ 
++
++def bpe_tokenizer():
++    """A small BPE vocabulary ('ab', 'abc', ' a' merge) with the chat specials: a reply the model wrote in pieces BPE
++    would merge decodes to text whose fresh encoding differs from the engine's ids."""
++    from strata_tokenizer import BYTE_TO_UNICODE, Tokenizer
++    tokens = list(BYTE_TO_UNICODE.values()) + ['ab', 'abc', ' a']
++    specials = ['<|im_start|>', '<|im_end|>', '<|endoftext|>', '<|image_pad|>',
++                '<x>', '<x>tail', 'tail>', '<think>', '</think>',
++                '<tool_call>', '</tool_call>', '<tool_response>', '</tool_response>', '<|vision_start|>', '<|vision_end|>']
++    tokens[258] = BYTE_TO_UNICODE[32] + 'a'
++    return Tokenizer(tokens + specials, ['a b', 'ab c', BYTE_TO_UNICODE[32] + ' a'],
++                     [1] * len(tokens) + [3] * 7 + [4] * (len(specials) - 7))
++
++
++class ReplyReuse(unittest.TestCase):
++    """A reply's own ids (what the engine holds) are reused by the next turn up to where its text differs - the one
++    place prompt ids may differ from a full encode, and the text they decode to is always the prompt's."""
++
++    def setUp(self):
++        from strata_tokenizer import BYTE_TO_UNICODE
++        self.b2u = BYTE_TO_UNICODE
++        self.tok = bpe_tokenizer()
++        self.enc = PromptEncoder(self.tok)
++        self.prompt = '<|im_start|>user\nabc<|im_end|>\n<|im_start|>assistant\n<think>\n'
++        self.pids = self.enc.encode(self.prompt)
++        # the model wrote 'abc' in pieces BPE would merge, then a hidden wrap-up the next turn will not have
++        self.gen = (self.tok.encode('a') + self.tok.encode('b') + self.tok.encode('c') + self.tok.encode(' a') +
++                    self.tok.encode('ZZZ') + self.tok.encode('</think>', parse_special=True))
++
++    @staticmethod
++    def common(a, b):
++        n = 0
++        while n < min(len(a), len(b)) and a[n] == b[n]:
++            n += 1
++        return n
++
++    def test_the_next_turn_keeps_the_reply_ids_up_to_the_difference(self):
++        self.assertTrue(self.enc.remember_reply(self.pids, self.gen))
++        text = self.prompt + 'abc a' + '\n</think>\n\nabc<|im_end|>'
++        ids = self.enc.encode(text)
++        self.assertEqual(self.tok.decode(ids), text)
++        self.assertEqual(ids[:len(self.pids) + 4], list(self.pids) + self.gen[:4])   # 'a' 'b' 'c' ' a', as written
++        self.assertLess(self.common(self.tok.encode(text, parse_special=True), list(self.pids) + self.gen),
++                        len(self.pids) + 4)   # a full encode merges 'abc' and leaves the engine's ids earlier
++
++    def test_without_its_prompt_nothing_is_kept(self):
++        self.assertFalse(self.enc.remember_reply([1, 2, 3], self.gen))
++        text = self.prompt + 'abc'
++        self.assertEqual(self.enc.encode(text), self.tok.encode(text, parse_special=True))
++
++    def test_a_tag_across_the_cut_is_encoded_whole(self):
++        gen = self.tok.encode('ab') + self.tok.encode('<') + self.tok.encode('x')   # '<x' as plain text
++        self.assertTrue(self.enc.remember_reply(self.pids, gen))
++        text = self.prompt + 'ab<x>tail' + '<|im_end|>'
++        ids = self.enc.encode(text)
++        self.assertEqual(self.tok.decode(ids), text)
++        self.assertIn(self.tok.encode('<x>tail', parse_special=True)[0], ids)   # the tag, not '<' 'x' '>' 't'...
++
++    def test_a_split_character_is_never_a_cut(self):
++        gen = [self.tok.ids[self.b2u[b]] for b in '中'.encode()] + self.tok.encode('abc')
++        self.assertTrue(self.enc.remember_reply(self.pids, gen))
++        for text in (self.prompt + '中abc', self.prompt + '中ab!', self.prompt + '文'):
++            self.assertEqual(self.tok.decode(self.enc.encode(text)), text)
++
+ if __name__ == "__main__":
+     unittest.main()
+diff --git i/serve/test_server.py w/serve/test_server.py
+index 56c2a2b..aea70b8 100644
+--- i/serve/test_server.py
++++ w/serve/test_server.py
+@@ -4110,6 +4110,28 @@ class ThinkingEngine(MockEngine):
+             yield t
+ 
+ 
++class InFlightThinkingEngine(ThinkingEngine):
++    """The real engine stops between verify windows: a consumer that stops reading leaves IN_FLIGHT more tokens
++    generated (and held in the engine's state), which the drain reads as `overrun`."""
++    IN_FLIGHT = 3
++
++    def generate(self, ids, max_new, sampling, cancel, embeddings=None):
++        self.prompts.append(list(ids))
++        self.overrun = []
++        done = self.tok.decode(ids).endswith("</think>\n\n")
++        text = self.ANSWER if done else self.THOUGHT + "</think>\n\n" + self.ANSWER
++        toks = (self.tok.encode(text) + self.tok.encode("<|im_end|>", parse_special=True))[:max_new]
++        sent = 0
++        try:
++            for t in toks:
++                if cancel.is_set():
++                    return
++                sent += 1
++                yield t
++        finally:
++            self.overrun = toks[sent:sent + self.IN_FLIGHT]
++
++
+ class EndsInsideThinkingEngine(ThinkingEngine):
+     """The #1053 reply: one sentence of reasoning, then the end-of-turn token, no </think>.  A prompt that ends the
+     thinking (the retry) gets the answer."""
+@@ -4259,6 +4281,49 @@ class ThinkingBudget(unittest.TestCase):
+         self.assertEqual(b["usage"]["completion_tokens"], 20 + len(extra) + len(ThinkingEngine.ANSWER) + 1)
+         self.assertEqual(b["usage"]["prompt_tokens"], len(first))
+ 
++    def test_the_continuation_keeps_the_tokens_generated_past_the_budget(self):
++        """The engine stopped a few tokens past the budget's cut: the next prompt holds them, so it extends the
++        engine's state (a prefix it already holds) instead of diverging from it a few tokens back."""
++        from serve.server import REASONING_WRAP_UP
++        self.engine = InFlightThinkingEngine(self.tok)
++        self.svc.engine = self.engine
++        code, b = self.openai(reasoning_budget_tokens=20)
++        self.assertEqual(code, 200, b)
++        msg = b["choices"][0]["message"]
++        wrap = REASONING_WRAP_UP.split("</think>")[0]
++        k = InFlightThinkingEngine.IN_FLIGHT
++        self.assertEqual(msg["reasoning_content"], ThinkingEngine.THOUGHT[:20 + k] + wrap)
++        self.assertEqual(msg["content"], ThinkingEngine.ANSWER)
++        first, second = self.engine.prompts
++        extra = self.tok.encode(REASONING_WRAP_UP, parse_special=True)
++        self.assertEqual(second, first + self.tok.encode(ThinkingEngine.THOUGHT[:20 + k]) + extra)
++        self.assertEqual(b["usage"]["completion_tokens"], 20 + k + len(extra) + len(ThinkingEngine.ANSWER) + 1)
++
++    def test_tokens_in_flight_that_could_hold_a_tag_are_left_out(self):
++        """As before the fix when what was in flight could hold a tag: the thinking stops at the budget."""
++        from serve.server import REASONING_WRAP_UP
++        self.engine = InFlightThinkingEngine(self.tok)
++        self.engine.THOUGHT = "x" * 20 + "a<b" + "y" * 20
++        self.svc.engine = self.engine
++        code, b = self.openai(reasoning_budget_tokens=20)
++        self.assertEqual(code, 200, b)
++        first, second = self.engine.prompts
++        extra = self.tok.encode(REASONING_WRAP_UP, parse_special=True)
++        self.assertEqual(second, first + self.tok.encode("x" * 20) + extra)
++
++    def test_tokens_in_flight_that_would_leave_no_room_to_answer_are_left_out(self):
++        """As before the fix when carrying them would leave the answer no room: the answer still gets its tokens."""
++        from serve.server import REASONING_WRAP_UP
++        self.engine = InFlightThinkingEngine(self.tok)
++        self.svc.engine = self.engine
++        extra = self.tok.encode(REASONING_WRAP_UP, parse_special=True)
++        room = 2                                    # answer tokens left without the carried ones, fewer than in flight
++        code, b = self.openai(reasoning_budget_tokens=20, max_tokens=20 + len(extra) + room)
++        self.assertEqual(code, 200, b)
++        first, second = self.engine.prompts
++        self.assertEqual(second, first + self.tok.encode(ThinkingEngine.THOUGHT[:20]) + extra)
++        self.assertEqual(b["choices"][0]["message"]["content"], ThinkingEngine.ANSWER[:room])
++
+     def test_llama_cpp_thinking_budget_tokens_is_the_same_budget(self):
+         """llama.cpp's name (pi-llama-cpp sends it): the same wrap-up; reasoning_budget_tokens wins when both are set."""
+         from serve.server import REASONING_WRAP_UP
+diff --git i/tools/strata_tokenizer.py w/tools/strata_tokenizer.py
+index 42a27fe..6a9966c 100644
+--- i/tools/strata_tokenizer.py
++++ w/tools/strata_tokenizer.py
+@@ -16,6 +16,7 @@ emoji (4-byte), combining marks, whitespace runs, and C0 control bytes.
+ from __future__ import annotations
+ 
+ import bisect
++import codecs
+ import json
+ import pathlib
+ import sys
+@@ -393,6 +394,12 @@ class PromptEncoder:
+         for e in entries:
+             same = plain_agree_until(e[1], plain, common_prefix_len(e[0], text))
+             k = bisect.bisect_right(e[3], same - margin) - 1   # the last boundary c with c <= same - margin
++            # a reply's own token boundaries (e[5]: where the reply starts) need no margin - the engine holds
++            # those ids, and the text from the cut on is encoded afresh - unless a tag could straddle the cut
++            if len(e) > 5 and same >= e[5]:
++                k2 = bisect.bisect_right(e[3], same) - 1
++                if k2 > k and e[3][k2] >= e[5] and not self._straddles(text, e[3][k2]):
++                    k = k2
+             if k >= 0 and (src is None or e[3][k] > src[3][cut_k]):
+                 src, cut_k = e, k
+         if src is None:
+@@ -416,6 +423,47 @@ class PromptEncoder:
+             self.entries = [(text, plain, ids, ends, counts)] + [e for e in self.entries if e is not old][:self.keep - 1]
+         return list(ids)
+ 
++    def _straddles(self, text: str, c: int) -> bool:
++        """A special literal that starts before `c` and ends after it: a cut there would split the tag."""
++        specials = getattr(self.tok, "special_tokens", None) or {}
++        lo = max(0, c - self.tok.max_special_len + 1)
++        p = text.find("<", lo, c)
++        while p >= 0:
++            if any(len(s) > c - p and text.startswith(s, p) for s in specials):
++                return True
++            p = text.find("<", p + 1, c)
++        return False
++
++    def remember_reply(self, prompt_ids, gen_ids) -> bool:
++        """The engine's session after a request is the prompt plus the reply's OWN ids - which are not always
++        what the reply's text encodes to (a model writes a Turkish word or a number in pieces BPE would merge).  The
++        next turn's prompt renders that text again: encoded afresh, it left the engine's ids at the first such piece
++        and the engine read the whole reply again from the turn's start.  Kept as an entry whose cuts are every token
++        boundary of the reply, the next prompt takes the reply's own ids up to where its text really differs."""
++        if not self.keep or not gen_ids or not hasattr(self.tok, "token_bytes"):
++            return False
++        prompt_ids = [int(t) for t in prompt_ids]
++        with self.lock:
++            entries = self.entries
++        base = next((e for e in entries if list(e[2]) == prompt_ids), None)
++        if base is None:
++            return False
++        dec = codecs.getincrementaldecoder("utf-8")("replace")
++        chars, ends, counts = len(base[0]), list(base[3]), list(base[4])
++        pieces = []
++        for j, t in enumerate(gen_ids):
++            s = dec.decode(self.tok.token_bytes(int(t)))
++            pieces.append(s)
++            chars += len(s)
++            if not dec.getstate()[0]:                   # no character split across this boundary
++                ends.append(chars)
++                counts.append(len(prompt_ids) + j + 1)
++        text = base[0] + "".join(pieces)
++        entry = (text, base[1], prompt_ids + [int(t) for t in gen_ids], ends, counts, len(base[0]))
++        with self.lock:
++            self.entries = [entry] + [e for e in self.entries if e is not base and e[0] != text][:self.keep - 1]
++        return True
++
+     def forget(self, ids: list[int]) -> None:
+         """The prompt with these ids was refused: it is not kept."""
+         with self.lock:

@@ -28,3 +28,6 @@ docker/compose/* text eol=lf
 
 # vendored KaTeX (serve/web/vendor): the files are hashed byte for byte (PROVENANCE.json), never convert their line endings.
 serve/web/vendor/** -text
+
+# Unified-diff context lines contain a required leading space, even when blank.
+rtx2080/experiments/patches/*.patch -whitespace

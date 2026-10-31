@@ -1,0 +1,699 @@
+{
+  "cli": [
+    {
+      "case": "decode-code",
+      "mtp": {
+        "event": "cli_result",
+        "label": "cli-mtp-decode-code",
+        "exit": 0,
+        "process_wall_s": 61.308696875999885,
+        "prompt_tokens": 79,
+        "dflash_active": false,
+        "decode": {
+          "tokens": 1024,
+          "ms": 44116.6,
+          "tps": 23.21
+        },
+        "prefill": {
+          "tokens": 78,
+          "ms": 1002.3,
+          "tps": 77.82
+        },
+        "engine_prefill_decode_s": 45.118900000000004,
+        "speculation": {
+          "rounds": 318,
+          "window": 6,
+          "accepted": 707,
+          "drafts": 780,
+          "acceptance": 0.906,
+          "tokens_per_round": 3.22
+        },
+        "output_sha256": "dffbd497a1be12e4552e04a8e4ef5852975161233def077174697110ec10dd52",
+        "diagnostics": [
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested"
+        ],
+        "at": 1792746196.6514084
+      },
+      "dflash2": {
+        "event": "cli_result",
+        "label": "cli-df2-decode-code",
+        "exit": 0,
+        "process_wall_s": 65.82035306099988,
+        "prompt_tokens": 79,
+        "dflash_active": true,
+        "decode": {
+          "tokens": 1024,
+          "ms": 48329.0,
+          "tps": 21.19
+        },
+        "prefill": {
+          "tokens": 78,
+          "ms": 1079.5,
+          "tps": 72.25
+        },
+        "engine_prefill_decode_s": 49.4085,
+        "speculation": {
+          "rounds": 315,
+          "window": 6,
+          "accepted": 711,
+          "drafts": 775,
+          "acceptance": 0.917,
+          "tokens_per_round": 3.26
+        },
+        "output_sha256": "15336574afbcbe41ddf114348f2aa1e040686a03a70d8113aae40a1a828fcd70",
+        "diagnostics": [
+          "strata generate: --draft dflash2: on a 12 GB NVIDIA card the MTP drafter was faster in most measurements (code prompts at a window of 6 gained 3%); continuing as asked",
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested",
+          "strata dflash2: 40525-token draft head (52.6 MiB), drafter 864 MiB of VRAM",
+          "strata generate: DFlash2 drafter on (${HOME}/models/flashnext-dflash2/qwen3.8-flash-next-dflash2.q8.pack, graphs captured in 2 ms), the MTP layer stays as the fallback"
+        ],
+        "at": 1792746262.4728684
+      },
+      "decode_change_pct": -8.70314519603619,
+      "prefill_change_pct": -7.157543048059612,
+      "engine_time_change_pct": 9.507323981745985
+    },
+    {
+      "case": "decode-prose",
+      "mtp": {
+        "event": "cli_result",
+        "label": "cli-mtp-decode-prose",
+        "exit": 0,
+        "process_wall_s": 65.29013255900009,
+        "prompt_tokens": 75,
+        "dflash_active": false,
+        "decode": {
+          "tokens": 1024,
+          "ms": 48089.1,
+          "tps": 21.29
+        },
+        "prefill": {
+          "tokens": 74,
+          "ms": 955.7,
+          "tps": 77.43
+        },
+        "engine_prefill_decode_s": 49.044799999999995,
+        "speculation": {
+          "rounds": 407,
+          "window": 6,
+          "accepted": 618,
+          "drafts": 747,
+          "acceptance": 0.827,
+          "tokens_per_round": 2.52
+        },
+        "output_sha256": "3651a74994a0543bda8c3f55b7a88bd1724e391b6fbaac4fedd1acffe556acba",
+        "diagnostics": [
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested"
+        ],
+        "at": 1792746400.7062066
+      },
+      "dflash2": {
+        "event": "cli_result",
+        "label": "cli-df2-decode-prose",
+        "exit": 0,
+        "process_wall_s": 72.94036694200076,
+        "prompt_tokens": 75,
+        "dflash_active": true,
+        "decode": {
+          "tokens": 1024,
+          "ms": 55558.8,
+          "tps": 18.43
+        },
+        "prefill": {
+          "tokens": 74,
+          "ms": 1059.5,
+          "tps": 69.84
+        },
+        "engine_prefill_decode_s": 56.618300000000005,
+        "speculation": {
+          "rounds": 423,
+          "window": 6,
+          "accepted": 601,
+          "drafts": 746,
+          "acceptance": 0.806,
+          "tokens_per_round": 2.42
+        },
+        "output_sha256": "a90262e2b831c307ccfdc520d9b7fed8a3b66ff1aa4ef0fe52fffac4cfdd7d45",
+        "diagnostics": [
+          "strata generate: --draft dflash2: on a 12 GB NVIDIA card the MTP drafter was faster in most measurements (code prompts at a window of 6 gained 3%); continuing as asked",
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested",
+          "strata dflash2: 40525-token draft head (52.6 MiB), drafter 864 MiB of VRAM",
+          "strata generate: DFlash2 drafter on (${HOME}/models/flashnext-dflash2/qwen3.8-flash-next-dflash2.q8.pack, graphs captured in 2 ms), the MTP layer stays as the fallback"
+        ],
+        "at": 1792746335.4148793
+      },
+      "decode_change_pct": -13.43353687177078,
+      "prefill_change_pct": -9.802402169701674,
+      "engine_time_change_pct": 15.442004045281067
+    },
+    {
+      "case": "needle-code",
+      "mtp": {
+        "event": "cli_result",
+        "label": "cli-mtp-needle-code",
+        "exit": 0,
+        "process_wall_s": 50.02552592900065,
+        "prompt_tokens": 19471,
+        "dflash_active": false,
+        "decode": {
+          "tokens": 13,
+          "ms": 627.2,
+          "tps": 20.73
+        },
+        "prefill": {
+          "tokens": 19470,
+          "ms": 32941.7,
+          "tps": 591.04
+        },
+        "engine_prefill_decode_s": 33.56889999999999,
+        "speculation": {
+          "rounds": 4,
+          "window": 6,
+          "accepted": 9,
+          "drafts": 11,
+          "acceptance": 0.818,
+          "tokens_per_round": 3.25
+        },
+        "output_sha256": "627331517632af63cce30addb1b2233503d835edcea7c9ccc2c6c1da0513f970",
+        "correct": true,
+        "diagnostics": [
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested"
+        ],
+        "at": 1792746450.7573524
+      },
+      "dflash2": {
+        "event": "cli_result",
+        "label": "cli-df2-needle-code",
+        "exit": 0,
+        "process_wall_s": 77.62466517800021,
+        "prompt_tokens": 19471,
+        "dflash_active": true,
+        "decode": {
+          "tokens": 13,
+          "ms": 1079.5,
+          "tps": 12.04
+        },
+        "prefill": {
+          "tokens": 19470,
+          "ms": 60101.1,
+          "tps": 323.95
+        },
+        "engine_prefill_decode_s": 61.1806,
+        "speculation": {
+          "rounds": 7,
+          "window": 6,
+          "accepted": 7,
+          "drafts": 13,
+          "acceptance": 0.538,
+          "tokens_per_round": 2.0
+        },
+        "output_sha256": "627331517632af63cce30addb1b2233503d835edcea7c9ccc2c6c1da0513f970",
+        "correct": true,
+        "diagnostics": [
+          "strata generate: --draft dflash2: on a 12 GB NVIDIA card the MTP drafter was faster in most measurements (code prompts at a window of 6 gained 3%); continuing as asked",
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested",
+          "strata dflash2: 40525-token draft head (52.6 MiB), drafter 864 MiB of VRAM",
+          "strata generate: DFlash2 drafter on (${HOME}/models/flashnext-dflash2/qwen3.8-flash-next-dflash2.q8.pack, graphs captured in 2 ms), the MTP layer stays as the fallback"
+        ],
+        "at": 1792746528.3939853
+      },
+      "decode_change_pct": -41.91992281717318,
+      "prefill_change_pct": -45.18983486735246,
+      "engine_time_change_pct": 82.25381230841646
+    },
+    {
+      "case": "needle-long",
+      "mtp": {
+        "event": "cli_result",
+        "label": "cli-mtp-needle-long",
+        "exit": 0,
+        "process_wall_s": 226.0610343190001,
+        "prompt_tokens": 121019,
+        "dflash_active": false,
+        "decode": {
+          "tokens": 26,
+          "ms": 1337.5,
+          "tps": 19.44
+        },
+        "prefill": {
+          "tokens": 121018,
+          "ms": 207578.4,
+          "tps": 583.0
+        },
+        "engine_prefill_decode_s": 208.9159,
+        "speculation": {
+          "rounds": 8,
+          "window": 6,
+          "accepted": 18,
+          "drafts": 21,
+          "acceptance": 0.857,
+          "tokens_per_round": 3.25
+        },
+        "output_sha256": "fcafc4a6481554e843812a463e7cd0cf3e8a68029b3fe079ee2a9d50c8ced139",
+        "correct": true,
+        "diagnostics": [
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested"
+        ],
+        "at": 1792747149.5862167
+      },
+      "dflash2": {
+        "event": "cli_result",
+        "label": "cli-df2-needle-long",
+        "exit": 0,
+        "process_wall_s": 394.94397255200056,
+        "prompt_tokens": 121019,
+        "dflash_active": true,
+        "decode": {
+          "tokens": 26,
+          "ms": 1987.7,
+          "tps": 13.08
+        },
+        "prefill": {
+          "tokens": 121018,
+          "ms": 376364.0,
+          "tps": 321.55
+        },
+        "engine_prefill_decode_s": 378.3517,
+        "speculation": {
+          "rounds": 11,
+          "window": 6,
+          "accepted": 15,
+          "drafts": 21,
+          "acceptance": 0.714,
+          "tokens_per_round": 2.36
+        },
+        "output_sha256": "fcafc4a6481554e843812a463e7cd0cf3e8a68029b3fe079ee2a9d50c8ced139",
+        "correct": true,
+        "diagnostics": [
+          "strata generate: --draft dflash2: on a 12 GB NVIDIA card the MTP drafter was faster in most measurements (code prompts at a window of 6 gained 3%); continuing as asked",
+          "strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 16907 2 MiB pages, vm.nr_hugepages=0); transparent huge pages are on for every mapping (THP always): MADV_HUGEPAGE not requested",
+          "strata dflash2: 40525-token draft head (52.6 MiB), drafter 864 MiB of VRAM",
+          "strata generate: DFlash2 drafter on (${HOME}/models/flashnext-dflash2/qwen3.8-flash-next-dflash2.q8.pack, graphs captured in 2 ms), the MTP layer stays as the fallback"
+        ],
+        "at": 1792746923.4533536
+      },
+      "decode_change_pct": -32.71604938271605,
+      "prefill_change_pct": -44.84562607204117,
+      "engine_time_change_pct": 81.10239574871994
+    }
+  ],
+  "api": [
+    {
+      "case": "decode-code",
+      "base": {
+        "wall_s": {
+          "mean": 33.14761025949974,
+          "min": 32.6601829909996,
+          "max": 33.635037527999884,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 71.6,
+          "min": 69.1,
+          "max": 74.1,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 31.95,
+          "min": 31.5,
+          "max": 32.4,
+          "n": 2
+        },
+        "prompt_tokens": [
+          79,
+          79
+        ],
+        "output_tokens": [
+          1024,
+          1024
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": []
+      },
+      "loans": {
+        "wall_s": {
+          "mean": 34.60178674400049,
+          "min": 34.182924583000386,
+          "max": 35.0206489050006,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 66.6,
+          "min": 63.4,
+          "max": 69.8,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 30.65,
+          "min": 30.3,
+          "max": 31.0,
+          "n": 2
+        },
+        "prompt_tokens": [
+          79,
+          79
+        ],
+        "output_tokens": [
+          1024,
+          1024
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": []
+      },
+      "wall_change_pct": 4.386972312985971,
+      "prefill_change_pct": -6.983240223463683,
+      "decode_change_pct": -4.068857589984354
+    },
+    {
+      "case": "decode-prose",
+      "base": {
+        "wall_s": {
+          "mean": 38.365227297000274,
+          "min": 38.221639073000915,
+          "max": 38.50881552099963,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 67.65,
+          "min": 65.6,
+          "max": 69.7,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 27.5,
+          "min": 27.4,
+          "max": 27.6,
+          "n": 2
+        },
+        "prompt_tokens": [
+          75,
+          75
+        ],
+        "output_tokens": [
+          1024,
+          1024
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": []
+      },
+      "loans": {
+        "wall_s": {
+          "mean": 39.82767068650037,
+          "min": 39.19191635200059,
+          "max": 40.46342502100015,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 57.45,
+          "min": 55.1,
+          "max": 59.8,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 26.6,
+          "min": 26.1,
+          "max": 27.1,
+          "n": 2
+        },
+        "prompt_tokens": [
+          75,
+          75
+        ],
+        "output_tokens": [
+          1024,
+          1024
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": []
+      },
+      "wall_change_pct": 3.8118981497978544,
+      "prefill_change_pct": -15.07760532150776,
+      "decode_change_pct": -3.2727272727272716
+    },
+    {
+      "case": "needle-code",
+      "base": {
+        "wall_s": {
+          "mean": 33.937649224999404,
+          "min": 33.74049638499855,
+          "max": 34.13480206500026,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 584.85,
+          "min": 582.1,
+          "max": 587.6,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 21.450000000000003,
+          "min": 20.1,
+          "max": 22.8,
+          "n": 2
+        },
+        "prompt_tokens": [
+          19471,
+          19471
+        ],
+        "output_tokens": [
+          13,
+          13
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": [
+          true,
+          true
+        ]
+      },
+      "loans": {
+        "wall_s": {
+          "mean": 28.003140599499602,
+          "min": 27.932285186999252,
+          "max": 28.073996011999952,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 711.8,
+          "min": 711.5,
+          "max": 712.1,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 21.549999999999997,
+          "min": 19.4,
+          "max": 23.7,
+          "n": 2
+        },
+        "prompt_tokens": [
+          19471,
+          19471
+        ],
+        "output_tokens": [
+          13,
+          13
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": [
+          true,
+          true
+        ]
+      },
+      "wall_change_pct": -17.48650469617171,
+      "prefill_change_pct": 21.706420449687936,
+      "decode_change_pct": 0.4662004662004504
+    },
+    {
+      "case": "needle-long",
+      "base": {
+        "wall_s": {
+          "mean": 209.7012905094998,
+          "min": 209.00480691200028,
+          "max": 210.39777410699935,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 581.95,
+          "min": 581.0,
+          "max": 582.9,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 24.5,
+          "min": 21.7,
+          "max": 27.3,
+          "n": 2
+        },
+        "prompt_tokens": [
+          121190,
+          121190
+        ],
+        "output_tokens": [
+          36,
+          26
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": [
+          true,
+          true
+        ]
+      },
+      "loans": {
+        "wall_s": {
+          "mean": 165.41356993699992,
+          "min": 165.33223129999988,
+          "max": 165.49490857399996,
+          "n": 2
+        },
+        "prefill_tps": {
+          "mean": 738.7,
+          "min": 738.2,
+          "max": 739.2,
+          "n": 2
+        },
+        "decode_tps": {
+          "mean": 21.8,
+          "min": 21.3,
+          "max": 22.3,
+          "n": 2
+        },
+        "prompt_tokens": [
+          121190,
+          121190
+        ],
+        "output_tokens": [
+          26,
+          26
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "retrieval_passes": [
+          true,
+          true
+        ]
+      },
+      "wall_change_pct": -21.119431580462113,
+      "prefill_change_pct": 26.93530372025088,
+      "decode_change_pct": -11.020408163265305
+    }
+  ],
+  "correctness": [
+    {
+      "event": "coding",
+      "label": "api-base-1",
+      "passed": true,
+      "exit": 0,
+      "at": 1792747526.30288
+    },
+    {
+      "event": "tool_check",
+      "label": "api-base-1",
+      "passed": true,
+      "at": 1792747529.3276737
+    },
+    {
+      "event": "coding",
+      "label": "api-loans-1",
+      "passed": true,
+      "exit": 0,
+      "at": 1792747833.3312852
+    },
+    {
+      "event": "tool_check",
+      "label": "api-loans-1",
+      "passed": true,
+      "at": 1792747836.590718
+    },
+    {
+      "event": "coding",
+      "label": "api-loans-2",
+      "passed": true,
+      "exit": 0,
+      "at": 1792748136.7409835
+    },
+    {
+      "event": "tool_check",
+      "label": "api-loans-2",
+      "passed": true,
+      "at": 1792748140.2291226
+    },
+    {
+      "event": "coding",
+      "label": "api-base-2",
+      "passed": true,
+      "exit": 0,
+      "at": 1792748486.0186143
+    },
+    {
+      "event": "tool_check",
+      "label": "api-base-2",
+      "passed": true,
+      "at": 1792748488.9244952
+    }
+  ],
+  "completed_api_arms": [
+    "api-base-1",
+    "api-loans-1",
+    "api-loans-2",
+    "api-base-2"
+  ],
+  "combined": [
+    {
+      "event": "combined_unsupported",
+      "reason": "CLI rejects borrowing; API accepts borrowing but falls back to MTP instead of DFlash2",
+      "engine_evidence": [
+        "[strata] 2026-10-23 11:42:00 engine started: ${WORKSPACE}/strata-023/build-turing-pr3281/strata --serve --pack packs/swift15-iq2xs-gsq --native ${HOME}/models/swift15-flashnext-iq2xs/Swift-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS-00001-of-00002.gguf --ple-gguf ${HOME}/models/swift15-flashnext-iq2xs/Swift-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS-00001-of-00002.gguf --ple-io mmap --expert-profile data/expert-profile.bin --expert-cache auto --spec 4 --spec-min-p 0.70 --kv int8 --prefill auto:131072 --mtp mtp/rt --max-context 131072 --kv-resident 32768 --pcie-frac 0.35 --adapt-every 1 --adapt-swaps 80 --adapt-decay 0.97 --conversation-cache-mib 8192 --conversation-cache-slots 2 --conversation-cache-min-tokens 1024 --vram-elastic --draft dflash2 --draft-model ${HOME}/models/flashnext-dflash2/qwen3.8-flash-next-dflash2.q8.pack --vision",
+        "strata generate: --draft dflash2 is off: it is for one card and the CLI run (not --serve, --batch or a layer split) in this build; the MTP drafts instead"
+      ],
+      "at": 1792748539.9486535
+    }
+  ],
+  "restoration": [
+    {
+      "event": "restored",
+      "phase": "cli",
+      "config_unchanged": true,
+      "at": 1792746107.1040387
+    },
+    {
+      "event": "restored",
+      "phase": "cli",
+      "config_unchanged": true,
+      "at": 1792747149.6736724
+    },
+    {
+      "event": "restored",
+      "phase": "api",
+      "config_unchanged": true,
+      "at": 1792748490.437832
+    },
+    {
+      "event": "restored",
+      "phase": "combined",
+      "config_unchanged": true,
+      "at": 1792748541.689673
+    }
+  ]
+}

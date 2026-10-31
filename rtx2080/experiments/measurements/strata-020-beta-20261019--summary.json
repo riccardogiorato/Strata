@@ -1,0 +1,854 @@
+{
+  "summary": {
+    "beta-turing": {
+      "code-100k": {
+        "runs": 2,
+        "boots": [
+          1,
+          2
+        ],
+        "prompt_n": {
+          "min": 121789,
+          "max": 121789,
+          "median": 121789.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 688.8,
+          "max": 688.9,
+          "median": 688.8499999999999
+        },
+        "predicted_per_second": {
+          "min": 47.0,
+          "max": 48.0,
+          "median": 47.5
+        },
+        "predicted_n": {
+          "min": 55,
+          "max": 66,
+          "median": 60.5
+        },
+        "wall_s": {
+          "min": 178.0940300780021,
+          "max": 178.3795702770003,
+          "median": 178.2368001775012
+        },
+        "needle_passes": 0
+      },
+      "code-25k": {
+        "runs": 2,
+        "boots": [
+          1,
+          2
+        ],
+        "prompt_n": {
+          "min": 20065,
+          "max": 20065,
+          "median": 20065.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 688.1,
+          "max": 691.6,
+          "median": 689.85
+        },
+        "predicted_per_second": {
+          "min": 44.4,
+          "max": 47.5,
+          "median": 45.95
+        },
+        "predicted_n": {
+          "min": 30,
+          "max": 30,
+          "median": 30.0
+        },
+        "wall_s": {
+          "min": 29.723145882002427,
+          "max": 29.827159501001006,
+          "median": 29.775152691501717
+        },
+        "needle_passes": 0
+      },
+      "needle-code": {
+        "runs": 2,
+        "boots": [
+          1,
+          2
+        ],
+        "prompt_n": {
+          "min": 19472,
+          "max": 19472,
+          "median": 19472.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 672.6,
+          "max": 674.8,
+          "median": 673.7
+        },
+        "predicted_per_second": {
+          "min": 52.5,
+          "max": 56.7,
+          "median": 54.6
+        },
+        "predicted_n": {
+          "min": 13,
+          "max": 13,
+          "median": 13.0
+        },
+        "wall_s": {
+          "min": 29.102878049998253,
+          "max": 29.21492624899838,
+          "median": 29.158902149498317
+        },
+        "needle_passes": 2
+      },
+      "short-0": {
+        "runs": 2,
+        "boots": [
+          1,
+          2
+        ],
+        "prompt_n": {
+          "min": 36,
+          "max": 36,
+          "median": 36.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 62.8,
+          "max": 63.5,
+          "median": 63.15
+        },
+        "predicted_per_second": {
+          "min": 51.1,
+          "max": 51.7,
+          "median": 51.400000000000006
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192.0
+        },
+        "wall_s": {
+          "min": 4.287057740999444,
+          "max": 4.334987065001769,
+          "median": 4.311022403000607
+        },
+        "needle_passes": 0
+      },
+      "short-1": {
+        "runs": 2,
+        "boots": [
+          1,
+          2
+        ],
+        "prompt_n": {
+          "min": 36,
+          "max": 36,
+          "median": 36.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 55.5,
+          "max": 57.5,
+          "median": 56.5
+        },
+        "predicted_per_second": {
+          "min": 60.6,
+          "max": 62.2,
+          "median": 61.400000000000006
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192.0
+        },
+        "wall_s": {
+          "min": 3.719646384000953,
+          "max": 3.820356587999413,
+          "median": 3.770001486000183
+        },
+        "needle_passes": 0
+      },
+      "short-2": {
+        "runs": 2,
+        "boots": [
+          1,
+          2
+        ],
+        "prompt_n": {
+          "min": 37,
+          "max": 37,
+          "median": 37.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 56.7,
+          "max": 57.9,
+          "median": 57.3
+        },
+        "predicted_per_second": {
+          "min": 52.3,
+          "max": 53.7,
+          "median": 53.0
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192.0
+        },
+        "wall_s": {
+          "min": 4.220938911999838,
+          "max": 4.326705560000846,
+          "median": 4.273822236000342
+        },
+        "needle_passes": 0
+      }
+    },
+    "beta-upstream": {
+      "code-100k": {
+        "runs": 1,
+        "boots": [
+          4
+        ],
+        "prompt_n": {
+          "min": 121789,
+          "max": 121789,
+          "median": 121789
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "prompt_per_second": {
+          "min": 688.4,
+          "max": 688.4,
+          "median": 688.4
+        },
+        "predicted_per_second": {
+          "min": 51.0,
+          "max": 51.0,
+          "median": 51.0
+        },
+        "predicted_n": {
+          "min": 55,
+          "max": 55,
+          "median": 55
+        },
+        "wall_s": {
+          "min": 178.14396689799833,
+          "max": 178.14396689799833,
+          "median": 178.14396689799833
+        },
+        "needle_passes": 0
+      },
+      "code-25k": {
+        "runs": 1,
+        "boots": [
+          4
+        ],
+        "prompt_n": {
+          "min": 20065,
+          "max": 20065,
+          "median": 20065
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "prompt_per_second": {
+          "min": 691.0,
+          "max": 691.0,
+          "median": 691.0
+        },
+        "predicted_per_second": {
+          "min": 43.9,
+          "max": 43.9,
+          "median": 43.9
+        },
+        "predicted_n": {
+          "min": 30,
+          "max": 30,
+          "median": 30
+        },
+        "wall_s": {
+          "min": 29.75587953700233,
+          "max": 29.75587953700233,
+          "median": 29.75587953700233
+        },
+        "needle_passes": 0
+      },
+      "needle-code": {
+        "runs": 1,
+        "boots": [
+          4
+        ],
+        "prompt_n": {
+          "min": 19472,
+          "max": 19472,
+          "median": 19472
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "prompt_per_second": {
+          "min": 669.2,
+          "max": 669.2,
+          "median": 669.2
+        },
+        "predicted_per_second": {
+          "min": 52.1,
+          "max": 52.1,
+          "median": 52.1
+        },
+        "predicted_n": {
+          "min": 13,
+          "max": 13,
+          "median": 13
+        },
+        "wall_s": {
+          "min": 29.3647697790002,
+          "max": 29.3647697790002,
+          "median": 29.3647697790002
+        },
+        "needle_passes": 1
+      },
+      "short-0": {
+        "runs": 1,
+        "boots": [
+          4
+        ],
+        "prompt_n": {
+          "min": 36,
+          "max": 36,
+          "median": 36
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "prompt_per_second": {
+          "min": 62.8,
+          "max": 62.8,
+          "median": 62.8
+        },
+        "predicted_per_second": {
+          "min": 45.6,
+          "max": 45.6,
+          "median": 45.6
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192
+        },
+        "wall_s": {
+          "min": 4.790206305002357,
+          "max": 4.790206305002357,
+          "median": 4.790206305002357
+        },
+        "needle_passes": 0
+      },
+      "short-1": {
+        "runs": 1,
+        "boots": [
+          4
+        ],
+        "prompt_n": {
+          "min": 36,
+          "max": 36,
+          "median": 36
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "prompt_per_second": {
+          "min": 53.3,
+          "max": 53.3,
+          "median": 53.3
+        },
+        "predicted_per_second": {
+          "min": 62.9,
+          "max": 62.9,
+          "median": 62.9
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192
+        },
+        "wall_s": {
+          "min": 3.730598448000819,
+          "max": 3.730598448000819,
+          "median": 3.730598448000819
+        },
+        "needle_passes": 0
+      },
+      "short-2": {
+        "runs": 1,
+        "boots": [
+          4
+        ],
+        "prompt_n": {
+          "min": 37,
+          "max": 37,
+          "median": 37
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "prompt_per_second": {
+          "min": 58.0,
+          "max": 58.0,
+          "median": 58.0
+        },
+        "predicted_per_second": {
+          "min": 52.7,
+          "max": 52.7,
+          "median": 52.7
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192
+        },
+        "wall_s": {
+          "min": 4.281352481000795,
+          "max": 4.281352481000795,
+          "median": 4.281352481000795
+        },
+        "needle_passes": 0
+      }
+    },
+    "current": {
+      "code-100k": {
+        "runs": 2,
+        "boots": [
+          0,
+          3
+        ],
+        "prompt_n": {
+          "min": 121789,
+          "max": 121789,
+          "median": 121789.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 689.7,
+          "max": 690.8,
+          "median": 690.25
+        },
+        "predicted_per_second": {
+          "min": 47.6,
+          "max": 51.9,
+          "median": 49.75
+        },
+        "predicted_n": {
+          "min": 58,
+          "max": 59,
+          "median": 58.5
+        },
+        "wall_s": {
+          "min": 177.5782725249992,
+          "max": 177.97934469499887,
+          "median": 177.77880860999903
+        },
+        "needle_passes": 0
+      },
+      "code-25k": {
+        "runs": 2,
+        "boots": [
+          0,
+          3
+        ],
+        "prompt_n": {
+          "min": 20065,
+          "max": 20065,
+          "median": 20065.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 690.8,
+          "max": 691.7,
+          "median": 691.25
+        },
+        "predicted_per_second": {
+          "min": 44.5,
+          "max": 46.7,
+          "median": 45.6
+        },
+        "predicted_n": {
+          "min": 30,
+          "max": 30,
+          "median": 30.0
+        },
+        "wall_s": {
+          "min": 29.68233878400133,
+          "max": 29.752401829999144,
+          "median": 29.717370307000238
+        },
+        "needle_passes": 0
+      },
+      "needle-code": {
+        "runs": 2,
+        "boots": [
+          0,
+          3
+        ],
+        "prompt_n": {
+          "min": 19472,
+          "max": 19472,
+          "median": 19472.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 667.6,
+          "max": 673.4,
+          "median": 670.5
+        },
+        "predicted_per_second": {
+          "min": 51.9,
+          "max": 56.1,
+          "median": 54.0
+        },
+        "predicted_n": {
+          "min": 13,
+          "max": 13,
+          "median": 13.0
+        },
+        "wall_s": {
+          "min": 29.165423614998872,
+          "max": 29.435414707000746,
+          "median": 29.30041916099981
+        },
+        "needle_passes": 2
+      },
+      "short-0": {
+        "runs": 2,
+        "boots": [
+          0,
+          3
+        ],
+        "prompt_n": {
+          "min": 36,
+          "max": 36,
+          "median": 36.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 60.6,
+          "max": 64.6,
+          "median": 62.599999999999994
+        },
+        "predicted_per_second": {
+          "min": 46.1,
+          "max": 49.5,
+          "median": 47.8
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192.0
+        },
+        "wall_s": {
+          "min": 4.442632732003403,
+          "max": 4.759541419000016,
+          "median": 4.6010870755017095
+        },
+        "needle_passes": 0
+      },
+      "short-1": {
+        "runs": 2,
+        "boots": [
+          0,
+          3
+        ],
+        "prompt_n": {
+          "min": 36,
+          "max": 36,
+          "median": 36.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 55.2,
+          "max": 57.2,
+          "median": 56.2
+        },
+        "predicted_per_second": {
+          "min": 60.8,
+          "max": 62.0,
+          "median": 61.4
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192.0
+        },
+        "wall_s": {
+          "min": 3.752161017000617,
+          "max": 3.793447666001157,
+          "median": 3.772804341500887
+        },
+        "needle_passes": 0
+      },
+      "short-2": {
+        "runs": 2,
+        "boots": [
+          0,
+          3
+        ],
+        "prompt_n": {
+          "min": 37,
+          "max": 37,
+          "median": 37.0
+        },
+        "cache_n": {
+          "min": 0,
+          "max": 0,
+          "median": 0.0
+        },
+        "prompt_per_second": {
+          "min": 55.8,
+          "max": 57.3,
+          "median": 56.55
+        },
+        "predicted_per_second": {
+          "min": 51.4,
+          "max": 51.5,
+          "median": 51.45
+        },
+        "predicted_n": {
+          "min": 192,
+          "max": 192,
+          "median": 192.0
+        },
+        "wall_s": {
+          "min": 4.381822887000453,
+          "max": 4.395506192999164,
+          "median": 4.388664539999809
+        },
+        "needle_passes": 0
+      }
+    }
+  },
+  "pairs": [
+    {
+      "current_boot": 0,
+      "beta_boot": 1,
+      "case": "code-100k",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": false,
+      "prompt_per_second_change_pct": -0.2750434279096714,
+      "predicted_per_second_change_pct": -7.514450867052025
+    },
+    {
+      "current_boot": 0,
+      "beta_boot": 1,
+      "case": "code-25k",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": true,
+      "prompt_per_second_change_pct": -0.39085118702951727,
+      "predicted_per_second_change_pct": 6.741573033707859
+    },
+    {
+      "current_boot": 0,
+      "beta_boot": 1,
+      "case": "needle-code",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": true,
+      "prompt_per_second_change_pct": -0.11880011880011088,
+      "predicted_per_second_change_pct": -6.417112299465244
+    },
+    {
+      "current_boot": 0,
+      "beta_boot": 1,
+      "case": "short-0",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": false,
+      "prompt_per_second_change_pct": 4.785478547854782,
+      "predicted_per_second_change_pct": 12.147505422993499
+    },
+    {
+      "current_boot": 0,
+      "beta_boot": 1,
+      "case": "short-1",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": true,
+      "prompt_per_second_change_pct": -2.9720279720279796,
+      "predicted_per_second_change_pct": -0.3289473684210509
+    },
+    {
+      "current_boot": 0,
+      "beta_boot": 1,
+      "case": "short-2",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": false,
+      "prompt_per_second_change_pct": 1.0471204188481797,
+      "predicted_per_second_change_pct": 4.474708171206232
+    },
+    {
+      "current_boot": 3,
+      "beta_boot": 2,
+      "case": "code-100k",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": false,
+      "prompt_per_second_change_pct": -0.1304915180513344,
+      "predicted_per_second_change_pct": -1.260504201680679
+    },
+    {
+      "current_boot": 3,
+      "beta_boot": 2,
+      "case": "code-25k",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": true,
+      "prompt_per_second_change_pct": -0.014457134595924348,
+      "predicted_per_second_change_pct": -4.925053533190582
+    },
+    {
+      "current_boot": 3,
+      "beta_boot": 2,
+      "case": "needle-code",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": true,
+      "prompt_per_second_change_pct": 1.0784901138406022,
+      "predicted_per_second_change_pct": 9.248554913294814
+    },
+    {
+      "current_boot": 3,
+      "beta_boot": 2,
+      "case": "short-0",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": false,
+      "prompt_per_second_change_pct": -2.786377708978327,
+      "predicted_per_second_change_pct": 3.232323232323231
+    },
+    {
+      "current_boot": 3,
+      "beta_boot": 2,
+      "case": "short-1",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": true,
+      "prompt_per_second_change_pct": 4.166666666666652,
+      "predicted_per_second_change_pct": 0.3225806451612856
+    },
+    {
+      "current_boot": 3,
+      "beta_boot": 2,
+      "case": "short-2",
+      "prompt_tokens_equal": true,
+      "semantic_message_equal": false,
+      "prompt_per_second_change_pct": 1.6129032258064724,
+      "predicted_per_second_change_pct": 1.553398058252431
+    }
+  ],
+  "pi": [
+    {
+      "event": "pi",
+      "arm": "current",
+      "wall_s": 40.011483434002,
+      "exit": 0,
+      "pass": true,
+      "protected_unchanged": true,
+      "at": 1792419735.4378064
+    },
+    {
+      "event": "pi",
+      "arm": "beta-turing",
+      "wall_s": 45.721628236999095,
+      "exit": 0,
+      "pass": true,
+      "protected_unchanged": true,
+      "at": 1792420127.119957
+    },
+    {
+      "event": "pi",
+      "arm": "beta-upstream",
+      "wall_s": 34.53602585800036,
+      "exit": 0,
+      "pass": true,
+      "protected_unchanged": true,
+      "at": 1792421213.8666422
+    }
+  ],
+  "connect": [
+    {
+      "event": "connect",
+      "app": "opencode",
+      "exit": 0,
+      "at": 1792420131.490061
+    },
+    {
+      "event": "connect",
+      "app": "claude-code",
+      "exit": 0,
+      "at": 1792420135.1656866
+    },
+    {
+      "event": "connect",
+      "app": "pi",
+      "exit": 0,
+      "at": 1792420138.7029996
+    }
+  ],
+  "cleanup": [
+    {
+      "event": "cleanup",
+      "gpu": "165.00 W, 65.78 W, 4 MiB\n",
+      "at": 1792421215.2987897
+    }
+  ]
+}

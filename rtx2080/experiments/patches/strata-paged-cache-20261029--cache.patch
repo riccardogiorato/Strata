@@ -1,0 +1,2514 @@
+diff --git a/bench/results/2026-10-30-persistent-prefix-pages/README.md b/bench/results/2026-10-30-persistent-prefix-pages/README.md
+new file mode 100644
+index 0000000..31722a5
+--- /dev/null
++++ b/bench/results/2026-10-30-persistent-prefix-pages/README.md
+@@ -0,0 +1,13 @@
++# Persistent prefix pages: local RTX 2080 evidence
++
++This opt-in feature preserves reusable text prefixes across engine restarts and native RAM eviction. On a 121K-token workload, two reversed-order pairs reduced cold restart request latency from 144.2 to 10.5 seconds, excluding engine startup. All code checks passed. A real read/write/test task with one restart passed in both arms and finished in 359.9 / 244.7 seconds including startup; the enabled run generated fewer tokens too.
++
++The cost is synchronous saving: new 121K histories took about 15 seconds longer; related new branches about 10 seconds longer in the initial profile. Both ordinary agent suites passed 10/10 scored tasks, with essentially unchanged 60.5 tok/s decode. All eleven tasks took 763 / 940 seconds: different model trajectories and 62.4 seconds of snapshot writes explain the increase. There were no SSD restores in that ordinary workload. Task8 already passed before edits and is excluded from quality scoring, but retained in whole-suite runtime.
++
++The later exploratory allocation of 2 GiB native parked RAM / one slot plus 4 GiB shared pages recovered the long branch in 4.31 seconds and a short conversation in 0.36 seconds. Peak sampled RSS was 48.2 GiB, process swap 16 MiB. No production settings were changed.
++
++[Measurements](measurements.json) contain token-weighted prefill/decode rates, prefix and expert hit rates, individual latency ranges, speed probes and memory observations. The full local harness and raw evidence are in `local-ai-rtx2080/experiments/strata-paged-cache-20261029`. The initial paired profile used 8 GiB native RAM / two slots plus 1 GiB hot pages; the allocation sweep is separate, one run per profile. Both paired arms used 20 checkpoints at 8192-token intervals, the same binary/model/profile and all existing PCIe/preload/fused-kernel settings. This is a custom A/B experiment, not a claim of conformance to the draft standard benchmark protocol.
++
++Validation: 264 native conversation-file checks plus memory/save-reclaim suites; 127 Python tests (126 pass, one optional JSON-schema skip); 62 GPU function checks; two long tool-using coding tasks; two usual suites with 20/20 scored tasks. Legacy serialization golden bytes and three real sessions round-tripped exactly. Not tested: HIP, SYCL, Windows, parallel/split engines or vision persistence.
++
++Inspired by oMLX shared persistent blocks, hot/cold tiers and coherent recurrent-state boundaries. No MLX code was copied. This stores serialized host/SSD state; it does not replace Strata's GPU KV allocator or port oMLX's background writer. [Configuration and limits](../../../docs/PERSISTENT_PREFIX_PAGES.md).
+diff --git a/bench/results/2026-10-30-persistent-prefix-pages/measurements.json b/bench/results/2026-10-30-persistent-prefix-pages/measurements.json
+new file mode 100644
+index 0000000..15fc08f
+--- /dev/null
++++ b/bench/results/2026-10-30-persistent-prefix-pages/measurements.json
+@@ -0,0 +1,1273 @@
++{
++  "code_commit": "b06c603",
++  "native_build_commit": "abedbac",
++  "base": "c1e013a",
++  "model": "Swift 1.5 Qwen3.8 Flash-Next IQ2_XS",
++  "hardware": "RTX 2080 8 GiB; i5-9600K; 64 GB RAM; Samsung 970 EVO; 165 W",
++  "capacity": 131072,
++  "long_context": [
++    {
++      "arm": "base",
++      "phase": "cold_seed",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 0,
++      "newly_read_tokens": 242032,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 847.9699760217387,
++      "decode_tps": 45.26503871351995,
++      "ttft_mean_seconds": 142.92406692300574,
++      "wall_mean_seconds": 143.30577254950185,
++      "ttft_range_seconds": [
++        142.3689736200031,
++        143.4791602260084
++      ],
++      "wall_range_seconds": [
++        142.75190216099145,
++        143.85964293801226
++      ],
++      "labels": [
++        "base-r1-A",
++        "base-r2-A"
++      ]
++    },
++    {
++      "arm": "base",
++      "phase": "branch_seed",
++      "requests": 6,
++      "prompt_tokens": 726096,
++      "cached_tokens": 540672,
++      "newly_read_tokens": 185424,
++      "generated_tokens": 114,
++      "prefix_token_hit_pct": 74.46288094136312,
++      "prefill_tps": 767.5568317997293,
++      "decode_tps": 63.64448414470746,
++      "ttft_mean_seconds": 40.404721902668825,
++      "wall_mean_seconds": 40.6734339381704,
++      "ttft_range_seconds": [
++        39.64903206398594,
++        40.9910472620104
++      ],
++      "wall_range_seconds": [
++        39.917832403007196,
++        41.265317283017794
++      ],
++      "labels": [
++        "base-r1-B",
++        "base-r1-C",
++        "base-r1-D",
++        "base-r2-B",
++        "base-r2-C",
++        "base-r2-D"
++      ]
++    },
++    {
++      "arm": "base",
++      "phase": "evicted_branch",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 180224,
++      "newly_read_tokens": 61808,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 74.46288094136312,
++      "prefill_tps": 770.1163746916195,
++      "decode_tps": 57.64563106796116,
++      "ttft_mean_seconds": 40.26816249950207,
++      "wall_mean_seconds": 40.56863406400953,
++      "ttft_range_seconds": [
++        40.21078978400328,
++        40.325535215000855
++      ],
++      "wall_range_seconds": [
++        40.50153272700845,
++        40.635735401010606
++      ],
++      "labels": [
++        "base-r1-return-A",
++        "base-r2-return-A"
++      ]
++    },
++    {
++      "arm": "base",
++      "phase": "native_hot",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 242018,
++      "newly_read_tokens": 14,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 16.82490085326283,
++      "decode_tps": 75.75757575757576,
++      "ttft_mean_seconds": 0.491640059495694,
++      "wall_mean_seconds": 0.7214701789926039,
++      "ttft_range_seconds": [
++        0.4913219489972107,
++        0.4919581699941773
++      ],
++      "wall_range_seconds": [
++        0.7087891929841135,
++        0.7341511650010943
++      ],
++      "labels": [
++        "base-r1-hot-A",
++        "base-r2-hot-A"
++      ]
++    },
++    {
++      "arm": "base",
++      "phase": "restart_cold_ssd",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 0,
++      "newly_read_tokens": 242032,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 842.7597358959127,
++      "decode_tps": 43.7083045778698,
++      "ttft_mean_seconds": 143.82478113649995,
++      "wall_mean_seconds": 144.22161848501128,
++      "ttft_range_seconds": [
++        143.45643273400492,
++        144.19312953899498
++      ],
++      "wall_range_seconds": [
++        143.80417355301324,
++        144.6390634170093
++      ],
++      "labels": [
++        "base-r1-restart-A",
++        "base-r2-restart-A"
++      ]
++    },
++    {
++      "arm": "base",
++      "phase": "mid_history_edit",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 114688,
++      "newly_read_tokens": 127344,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 47.385469689958356,
++      "prefill_tps": 800.3368675092544,
++      "decode_tps": 57.22029814786929,
++      "ttft_mean_seconds": 79.69602061049955,
++      "wall_mean_seconds": 79.99782900200807,
++      "ttft_range_seconds": [
++        79.4838830929948,
++        79.90815812800429
++      ],
++      "wall_range_seconds": [
++        79.81966347101843,
++        80.17599453299772
++      ],
++      "labels": [
++        "base-r1-edit-A",
++        "base-r2-edit-A"
++      ]
++    },
++    {
++      "arm": "pages",
++      "phase": "cold_seed",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 0,
++      "newly_read_tokens": 242032,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 842.903844700525,
++      "decode_tps": 44.84304932735426,
++      "ttft_mean_seconds": 143.98659002299246,
++      "wall_mean_seconds": 158.150825140503,
++      "ttft_range_seconds": [
++        143.86232578600175,
++        144.11085425998317
++      ],
++      "wall_range_seconds": [
++        157.93527722000726,
++        158.36637306099874
++      ],
++      "labels": [
++        "pages-r1-A",
++        "pages-r2-A"
++      ]
++    },
++    {
++      "arm": "pages",
++      "phase": "branch_seed",
++      "requests": 6,
++      "prompt_tokens": 726096,
++      "cached_tokens": 540672,
++      "newly_read_tokens": 185424,
++      "generated_tokens": 114,
++      "prefix_token_hit_pct": 74.46288094136312,
++      "prefill_tps": 764.5628515905096,
++      "decode_tps": 57.36137667304015,
++      "ttft_mean_seconds": 40.58179784399302,
++      "wall_mean_seconds": 50.24941668750156,
++      "ttft_range_seconds": [
++        40.30459541399614,
++        40.79841420700541
++      ],
++      "wall_range_seconds": [
++        49.47276738000801,
++        50.96177036999143
++      ],
++      "labels": [
++        "pages-r1-B",
++        "pages-r1-C",
++        "pages-r1-D",
++        "pages-r2-B",
++        "pages-r2-C",
++        "pages-r2-D"
++      ]
++    },
++    {
++      "arm": "pages",
++      "phase": "evicted_branch",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 242018,
++      "newly_read_tokens": 14,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 23.462376403552877,
++      "decode_tps": 73.03478762252547,
++      "ttft_mean_seconds": 11.015183909490588,
++      "wall_mean_seconds": 11.25592461299675,
++      "ttft_range_seconds": [
++        7.328053498989902,
++        14.702314319991274
++      ],
++      "wall_range_seconds": [
++        7.569332749990281,
++        14.94251647600322
++      ],
++      "labels": [
++        "pages-r1-return-A",
++        "pages-r2-return-A"
++      ]
++    },
++    {
++      "arm": "pages",
++      "phase": "native_hot",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 242018,
++      "newly_read_tokens": 14,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 79.8175598631699,
++      "decode_tps": 73.90120575651497,
++      "ttft_mean_seconds": 0.18783949749195017,
++      "wall_mean_seconds": 0.4273270844860235,
++      "ttft_range_seconds": [
++        0.18215871098800562,
++        0.19352028399589472
++      ],
++      "wall_range_seconds": [
++        0.4028038239921443,
++        0.45185034497990273
++      ],
++      "labels": [
++        "pages-r1-hot-A",
++        "pages-r2-hot-A"
++      ]
++    },
++    {
++      "arm": "pages",
++      "phase": "restart_cold_ssd",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 242018,
++      "newly_read_tokens": 14,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 6.209802616988246,
++      "decode_tps": 59.91800693787448,
++      "ttft_mean_seconds": 10.18520187350805,
++      "wall_mean_seconds": 10.471013814007165,
++      "ttft_range_seconds": [
++        9.72664081401308,
++        10.643762933003018
++      ],
++      "wall_range_seconds": [
++        10.00744895299431,
++        10.93457867502002
++      ],
++      "labels": [
++        "pages-r1-restart-A",
++        "pages-r2-restart-A"
++      ]
++    },
++    {
++      "arm": "pages",
++      "phase": "mid_history_edit",
++      "requests": 2,
++      "prompt_tokens": 242032,
++      "cached_tokens": 114688,
++      "newly_read_tokens": 127344,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 47.385469689958356,
++      "prefill_tps": 819.7691148458266,
++      "decode_tps": 71.2410948631421,
++      "ttft_mean_seconds": 77.83064532249409,
++      "wall_mean_seconds": 88.39545854349853,
++      "ttft_range_seconds": [
++        77.70513097199728,
++        77.9561596729909
++      ],
++      "wall_range_seconds": [
++        88.24482299399097,
++        88.5460940930061
++      ],
++      "labels": [
++        "pages-r1-edit-A",
++        "pages-r2-edit-A"
++      ]
++    },
++    {
++      "arm": "ram4-hot1",
++      "phase": "cold_seed",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 0,
++      "newly_read_tokens": 121016,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 843.4804791450887,
++      "decode_tps": 42.35399019170753,
++      "ttft_mean_seconds": 143.90152767501422,
++      "wall_mean_seconds": 158.2031716670026,
++      "ttft_range_seconds": [
++        143.90152767501422,
++        143.90152767501422
++      ],
++      "wall_range_seconds": [
++        158.2031716670026,
++        158.2031716670026
++      ],
++      "labels": [
++        "ram4-hot1-A"
++      ]
++    },
++    {
++      "arm": "ram4-hot1",
++      "phase": "branch_seed",
++      "requests": 3,
++      "prompt_tokens": 363048,
++      "cached_tokens": 270336,
++      "newly_read_tokens": 92712,
++      "generated_tokens": 57,
++      "prefix_token_hit_pct": 74.46288094136312,
++      "prefill_tps": 780.3528051188558,
++      "decode_tps": 54.22890305394349,
++      "ttft_mean_seconds": 39.762990513341116,
++      "wall_mean_seconds": 48.078494730997285,
++      "ttft_range_seconds": [
++        39.53627290899749,
++        40.147018839023076
++      ],
++      "wall_range_seconds": [
++        47.139022058981936,
++        48.78063876699889
++      ],
++      "labels": [
++        "ram4-hot1-B",
++        "ram4-hot1-C",
++        "ram4-hot1-D"
++      ]
++    },
++    {
++      "arm": "ram4-hot1",
++      "phase": "evicted_branch",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 121009,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 61.56552330694811,
++      "decode_tps": 55.84950029394474,
++      "ttft_mean_seconds": 5.846534607000649,
++      "wall_mean_seconds": 6.167907606984954,
++      "ttft_range_seconds": [
++        5.846534607000649,
++        5.846534607000649
++      ],
++      "wall_range_seconds": [
++        6.167907606984954,
++        6.167907606984954
++      ],
++      "labels": [
++        "ram4-hot1-return-A"
++      ]
++    },
++    {
++      "arm": "ram4-hot1",
++      "phase": "native_hot",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 121009,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 81.01851851851852,
++      "decode_tps": 71.0014947683109,
++      "ttft_mean_seconds": 0.19018762299674563,
++      "wall_mean_seconds": 0.44284460198832676,
++      "ttft_range_seconds": [
++        0.19018762299674563,
++        0.19018762299674563
++      ],
++      "wall_range_seconds": [
++        0.44284460198832676,
++        0.44284460198832676
++      ],
++      "labels": [
++        "ram4-hot1-hot-A"
++      ]
++    },
++    {
++      "arm": "ram4-hot1",
++      "phase": "short_seed",
++      "requests": 2,
++      "prompt_tokens": 10226,
++      "cached_tokens": 0,
++      "newly_read_tokens": 10226,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 590.2214629134753,
++      "decode_tps": 74.65618860510806,
++      "ttft_mean_seconds": 8.692042326496448,
++      "wall_mean_seconds": 8.925965411486686,
++      "ttft_range_seconds": [
++        8.68346338099218,
++        8.700621272000717
++      ],
++      "wall_range_seconds": [
++        8.895281376986532,
++        8.95664944598684
++      ],
++      "labels": [
++        "ram4-hot1-short-A",
++        "ram4-hot1-short-B"
++      ]
++    },
++    {
++      "arm": "ram4-hot1",
++      "phase": "short_return",
++      "requests": 1,
++      "prompt_tokens": 5113,
++      "cached_tokens": 5106,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.8630940739292,
++      "prefill_tps": 54.09582689335394,
++      "decode_tps": 76.33587786259542,
++      "ttft_mean_seconds": 0.15643761801766232,
++      "wall_mean_seconds": 0.38486110500525683,
++      "ttft_range_seconds": [
++        0.15643761801766232,
++        0.15643761801766232
++      ],
++      "wall_range_seconds": [
++        0.38486110500525683,
++        0.38486110500525683
++      ],
++      "labels": [
++        "ram4-hot1-short-return-A"
++      ]
++    },
++    {
++      "arm": "ram0-hot4",
++      "phase": "cold_seed",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 0,
++      "newly_read_tokens": 121016,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 844.9669668579345,
++      "decode_tps": 44.43405051449953,
++      "ttft_mean_seconds": 143.63856503501302,
++      "wall_mean_seconds": 157.86105271501583,
++      "ttft_range_seconds": [
++        143.63856503501302,
++        143.63856503501302
++      ],
++      "wall_range_seconds": [
++        157.86105271501583,
++        157.86105271501583
++      ],
++      "labels": [
++        "ram0-hot4-A"
++      ]
++    },
++    {
++      "arm": "ram0-hot4",
++      "phase": "branch_seed",
++      "requests": 3,
++      "prompt_tokens": 363048,
++      "cached_tokens": 270336,
++      "newly_read_tokens": 92712,
++      "generated_tokens": 57,
++      "prefix_token_hit_pct": 74.46288094136312,
++      "prefill_tps": 792.6283985849096,
++      "decode_tps": 54.79188695568586,
++      "ttft_mean_seconds": 39.14984689133902,
++      "wall_mean_seconds": 45.14744571900034,
++      "ttft_range_seconds": [
++        39.124272491026204,
++        39.18526526298956
++      ],
++      "wall_range_seconds": [
++        45.00759600198944,
++        45.36002998400363
++      ],
++      "labels": [
++        "ram0-hot4-B",
++        "ram0-hot4-C",
++        "ram0-hot4-D"
++      ]
++    },
++    {
++      "arm": "ram0-hot4",
++      "phase": "evicted_branch",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 121009,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 68.56023506366309,
++      "decode_tps": 70.81625046589639,
++      "ttft_mean_seconds": 3.027706053981092,
++      "wall_mean_seconds": 3.2768425539834425,
++      "ttft_range_seconds": [
++        3.027706053981092,
++        3.027706053981092
++      ],
++      "wall_range_seconds": [
++        3.2768425539834425,
++        3.2768425539834425
++      ],
++      "labels": [
++        "ram0-hot4-return-A"
++      ]
++    },
++    {
++      "arm": "ram0-hot4",
++      "phase": "native_hot",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 121009,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 90.20618556701032,
++      "decode_tps": 76.89194658033185,
++      "ttft_mean_seconds": 0.17313315399223939,
++      "wall_mean_seconds": 0.40468115400290117,
++      "ttft_range_seconds": [
++        0.17313315399223939,
++        0.17313315399223939
++      ],
++      "wall_range_seconds": [
++        0.40468115400290117,
++        0.40468115400290117
++      ],
++      "labels": [
++        "ram0-hot4-hot-A"
++      ]
++    },
++    {
++      "arm": "ram0-hot4",
++      "phase": "short_seed",
++      "requests": 2,
++      "prompt_tokens": 10226,
++      "cached_tokens": 0,
++      "newly_read_tokens": 10226,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 594.1583531366749,
++      "decode_tps": 79.002079002079,
++      "ttft_mean_seconds": 8.634666222002124,
++      "wall_mean_seconds": 8.854752202998498,
++      "ttft_range_seconds": [
++        8.629884444002528,
++        8.639448000001721
++      ],
++      "wall_range_seconds": [
++        8.854254701000173,
++        8.855249704996822
++      ],
++      "labels": [
++        "ram0-hot4-short-A",
++        "ram0-hot4-short-B"
++      ]
++    },
++    {
++      "arm": "ram0-hot4",
++      "phase": "short_return",
++      "requests": 1,
++      "prompt_tokens": 5113,
++      "cached_tokens": 0,
++      "newly_read_tokens": 5113,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 597.8578611351464,
++      "decode_tps": 82.07343412526998,
++      "ttft_mean_seconds": 8.577915699977893,
++      "wall_mean_seconds": 8.788864543981617,
++      "ttft_range_seconds": [
++        8.577915699977893,
++        8.577915699977893
++      ],
++      "wall_range_seconds": [
++        8.788864543981617,
++        8.788864543981617
++      ],
++      "labels": [
++        "ram0-hot4-short-return-A"
++      ]
++    },
++    {
++      "arm": "ram2-hot4",
++      "phase": "cold_seed",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 0,
++      "newly_read_tokens": 121016,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 843.94635721409,
++      "decode_tps": 45.35688708522321,
++      "ttft_mean_seconds": 143.85668596398318,
++      "wall_mean_seconds": 158.12780870799907,
++      "ttft_range_seconds": [
++        143.85668596398318,
++        143.85668596398318
++      ],
++      "wall_range_seconds": [
++        158.12780870799907,
++        158.12780870799907
++      ],
++      "labels": [
++        "ram2-hot4-A"
++      ]
++    },
++    {
++      "arm": "ram2-hot4",
++      "phase": "branch_seed",
++      "requests": 3,
++      "prompt_tokens": 363048,
++      "cached_tokens": 270336,
++      "newly_read_tokens": 92712,
++      "generated_tokens": 57,
++      "prefix_token_hit_pct": 74.46288094136312,
++      "prefill_tps": 792.2924283055341,
++      "decode_tps": 57.97396257119609,
++      "ttft_mean_seconds": 39.16634766833158,
++      "wall_mean_seconds": 45.20863874264372,
++      "ttft_range_seconds": [
++        39.16174578398932,
++        39.17413044400746
++      ],
++      "wall_range_seconds": [
++        45.141202570986934,
++        45.24279852898326
++      ],
++      "labels": [
++        "ram2-hot4-B",
++        "ram2-hot4-C",
++        "ram2-hot4-D"
++      ]
++    },
++    {
++      "arm": "ram2-hot4",
++      "phase": "evicted_branch",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 121009,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 67.4373795761079,
++      "decode_tps": 73.87247278382581,
++      "ttft_mean_seconds": 4.069910331978463,
++      "wall_mean_seconds": 4.311164228012785,
++      "ttft_range_seconds": [
++        4.069910331978463,
++        4.069910331978463
++      ],
++      "wall_range_seconds": [
++        4.311164228012785,
++        4.311164228012785
++      ],
++      "labels": [
++        "ram2-hot4-return-A"
++      ]
++    },
++    {
++      "arm": "ram2-hot4",
++      "phase": "native_hot",
++      "requests": 1,
++      "prompt_tokens": 121016,
++      "cached_tokens": 121009,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.99421564090699,
++      "prefill_tps": 89.97429305912597,
++      "decode_tps": 80.03369839932603,
++      "ttft_mean_seconds": 0.17137914401246235,
++      "wall_mean_seconds": 0.3937035429989919,
++      "ttft_range_seconds": [
++        0.17137914401246235,
++        0.17137914401246235
++      ],
++      "wall_range_seconds": [
++        0.3937035429989919,
++        0.3937035429989919
++      ],
++      "labels": [
++        "ram2-hot4-hot-A"
++      ]
++    },
++    {
++      "arm": "ram2-hot4",
++      "phase": "short_seed",
++      "requests": 2,
++      "prompt_tokens": 10226,
++      "cached_tokens": 0,
++      "newly_read_tokens": 10226,
++      "generated_tokens": 38,
++      "prefix_token_hit_pct": 0.0,
++      "prefill_tps": 594.0133952169898,
++      "decode_tps": 81.77318700236712,
++      "ttft_mean_seconds": 8.636485913011711,
++      "wall_mean_seconds": 8.848387119505787,
++      "ttft_range_seconds": [
++        8.584270244988147,
++        8.688701581035275
++      ],
++      "wall_range_seconds": [
++        8.795392967003863,
++        8.901381272007711
++      ],
++      "labels": [
++        "ram2-hot4-short-A",
++        "ram2-hot4-short-B"
++      ]
++    },
++    {
++      "arm": "ram2-hot4",
++      "phase": "short_return",
++      "requests": 1,
++      "prompt_tokens": 5113,
++      "cached_tokens": 5106,
++      "newly_read_tokens": 7,
++      "generated_tokens": 19,
++      "prefix_token_hit_pct": 99.8630940739292,
++      "prefill_tps": 56.497175141242934,
++      "decode_tps": 81.9318671841311,
++      "ttft_mean_seconds": 0.14900592697085813,
++      "wall_mean_seconds": 0.36034140101401135,
++      "ttft_range_seconds": [
++        0.14900592697085813,
++        0.14900592697085813
++      ],
++      "wall_range_seconds": [
++        0.36034140101401135,
++        0.36034140101401135
++      ],
++      "labels": [
++        "ram2-hot4-short-return-A"
++      ]
++    }
++  ],
++  "long_agent": {
++    "long-agent-base": {
++      "requests": 4,
++      "prompt_tokens": 489976,
++      "cached_tokens": 246627,
++      "newly_read_tokens": 243349,
++      "generated_tokens": 1766,
++      "prefix_token_hit_pct": 50.334506179894525,
++      "prefill_tps": 840.2299687972491,
++      "decode_tps": 62.26224179326538,
++      "ttft_mean_seconds": 72.55318860249827,
++      "wall_mean_seconds": 79.61252366575354,
++      "ttft_range_seconds": [
++        0.48112219499307685,
++        144.80336756599718
++      ],
++      "wall_range_seconds": [
++        0.8592585739970673,
++        167.75363820200437
++      ],
++      "labels": [
++        "long-agent-base-turn0",
++        "long-agent-base-turn1",
++        "long-agent-base-turn2",
++        "long-agent-base-turn3"
++      ]
++    },
++    "long-agent-pages": {
++      "requests": 4,
++      "prompt_tokens": 489470,
++      "cached_tokens": 367628,
++      "newly_read_tokens": 121842,
++      "generated_tokens": 1545,
++      "prefix_token_hit_pct": 75.10736102314749,
++      "prefill_tps": 824.7267765111058,
++      "decode_tps": 60.55380273961865,
++      "ttft_mean_seconds": 38.87200710050092,
++      "wall_mean_seconds": 50.6648076400088,
++      "ttft_range_seconds": [
++        0.40964212801191024,
++        144.56443744999706
++      ],
++      "wall_range_seconds": [
++        5.34382308300701,
++        158.90965539799072
++      ],
++      "labels": [
++        "long-agent-pages-turn0",
++        "long-agent-pages-turn1",
++        "long-agent-pages-turn2",
++        "long-agent-pages-turn3"
++      ]
++    }
++  },
++  "usual_agent": {
++    "agent-base": {
++      "passed": 10,
++      "task_count": 10,
++      "wall_s": 626,
++      "metrics": {
++        "prompt_tokens": 467831,
++        "cached_tokens": 410047,
++        "read_tokens": 57784,
++        "prefill_ms": 162024,
++        "output_tokens": 26404,
++        "decode_ms": 436610,
++        "draft_accepted": 16323,
++        "draft_offered": 19359,
++        "expert_hits": 9815243,
++        "expert_lookups": 12067477,
++        "expert_pcie": 729446,
++        "suffix_windows": 352,
++        "suffix_accepted": 781,
++        "suffix_offered": 1002,
++        "requests": 89,
++        "decode_tps": 60.47502347632899,
++        "prefill_tps": 356.63852268799684,
++        "prompt_cache_token_hit_pct": 87.64853120036936,
++        "prompt_cache_request_hit_pct": 88.76404494382022,
++        "draft_acceptance_pct": 84.3173717650705,
++        "suffix_acceptance_pct": 77.9441117764471,
++        "suffix_accepted_per_window": 2.21875,
++        "expert_cache_hit_pct": 81.33633070110679,
++        "expert_resident_share_all_routed_pct": 76.70002390418384,
++        "expert_pool_miss_share_all_routed_pct": 17.59980895407435,
++        "expert_pcie_share_pct": 5.700167141741808,
++        "prompt_min": 1634,
++        "prompt_max": 13556,
++        "continuation_requests": 79,
++        "continuation_cache_hits": 79,
++        "continuation_cache_request_hit_pct": 100.0,
++        "continuation_cache_token_hit_pct": 90.94028126157416,
++        "reply_resume_gaps_over64": 4,
++        "reply_resume_gap_tokens_over64": 6590,
++        "reply_resume_gap_median": -1,
++        "reply_resume_gap_max": 5828
++      }
++    },
++    "agent-pages": {
++      "passed": 10,
++      "task_count": 10,
++      "wall_s": 527,
++      "metrics": {
++        "prompt_tokens": 383114,
++        "cached_tokens": 332513,
++        "read_tokens": 50601,
++        "prefill_ms": 139787,
++        "output_tokens": 21529,
++        "decode_ms": 355441,
++        "draft_accepted": 13460,
++        "draft_offered": 15769,
++        "expert_hits": 7720689,
++        "expert_lookups": 9684394,
++        "expert_pcie": 635375,
++        "suffix_windows": 266,
++        "suffix_accepted": 534,
++        "suffix_offered": 757,
++        "requests": 83,
++        "decode_tps": 60.56982734124651,
++        "prefill_tps": 361.9864508144534,
++        "prompt_cache_token_hit_pct": 86.79218196150494,
++        "prompt_cache_request_hit_pct": 87.95180722891567,
++        "draft_acceptance_pct": 85.35734669287844,
++        "suffix_acceptance_pct": 70.54161162483487,
++        "suffix_accepted_per_window": 2.007518796992481,
++        "expert_cache_hit_pct": 79.72299557411645,
++        "expert_resident_share_all_routed_pct": 74.81455253504221,
++        "expert_pool_miss_share_all_routed_pct": 19.028575155122173,
++        "expert_pcie_share_pct": 6.1568723098356175,
++        "prompt_min": 1634,
++        "prompt_max": 14110,
++        "continuation_requests": 73,
++        "continuation_cache_hits": 73,
++        "continuation_cache_request_hit_pct": 100.0,
++        "continuation_cache_token_hit_pct": 90.80588781473593,
++        "reply_resume_gaps_over64": 1,
++        "reply_resume_gap_tokens_over64": 247,
++        "reply_resume_gap_median": -1,
++        "reply_resume_gap_max": 247
++      }
++    }
++  },
++  "usual_agent_all_tasks": {
++    "agent-base": {
++      "wall_s": 763,
++      "metrics": {
++        "prompt_tokens": 616018,
++        "cached_tokens": 549468,
++        "read_tokens": 66550,
++        "prefill_ms": 191686,
++        "output_tokens": 32533,
++        "decode_ms": 539101,
++        "draft_accepted": 19977,
++        "draft_offered": 23637,
++        "expert_hits": 12089635,
++        "expert_lookups": 14841970,
++        "expert_pcie": 887312,
++        "suffix_windows": 485,
++        "suffix_accepted": 1195,
++        "suffix_offered": 1465,
++        "requests": 107,
++        "decode_tps": 60.34676248049994,
++        "prefill_tps": 347.18237116951684,
++        "prompt_cache_token_hit_pct": 89.19674425097968,
++        "prompt_cache_request_hit_pct": 89.7196261682243,
++        "draft_acceptance_pct": 84.51580149765199,
++        "suffix_acceptance_pct": 81.56996587030717,
++        "suffix_accepted_per_window": 2.463917525773196,
++        "expert_cache_hit_pct": 81.45572993342527,
++        "expert_resident_share_all_routed_pct": 76.86069205193219,
++        "expert_pool_miss_share_all_routed_pct": 17.498160437329563,
++        "expert_pcie_share_pct": 5.641147510738253,
++        "prompt_min": 1634,
++        "prompt_max": 13556,
++        "continuation_requests": 0,
++        "continuation_cache_hits": 0,
++        "continuation_cache_request_hit_pct": null,
++        "continuation_cache_token_hit_pct": null,
++        "reply_resume_gaps_over64": 0,
++        "reply_resume_gap_tokens_over64": 0,
++        "reply_resume_gap_median": null,
++        "reply_resume_gap_max": null
++      }
++    },
++    "agent-pages": {
++      "wall_s": 940,
++      "metrics": {
++        "prompt_tokens": 1078309,
++        "cached_tokens": 1009911,
++        "read_tokens": 68398,
++        "prefill_ms": 196026,
++        "output_tokens": 37911,
++        "decode_ms": 645828,
++        "draft_accepted": 22789,
++        "draft_offered": 27013,
++        "expert_hits": 13963055,
++        "expert_lookups": 17235755,
++        "expert_pcie": 1048103,
++        "suffix_windows": 596,
++        "suffix_accepted": 1203,
++        "suffix_offered": 1615,
++        "requests": 116,
++        "decode_tps": 58.70138798565562,
++        "prefill_tps": 348.9231020374848,
++        "prompt_cache_token_hit_pct": 93.65692023343958,
++        "prompt_cache_request_hit_pct": 90.51724137931035,
++        "draft_acceptance_pct": 84.36308444082479,
++        "suffix_acceptance_pct": 74.48916408668731,
++        "suffix_accepted_per_window": 2.0184563758389262,
++        "expert_cache_hit_pct": 81.01214597213757,
++        "expert_resident_share_all_routed_pct": 76.36820959777745,
++        "expert_pool_miss_share_all_routed_pct": 17.899395193290168,
++        "expert_pcie_share_pct": 5.732395208932382,
++        "prompt_min": 1634,
++        "prompt_max": 32751,
++        "continuation_requests": 0,
++        "continuation_cache_hits": 0,
++        "continuation_cache_request_hit_pct": null,
++        "continuation_cache_token_hit_pct": null,
++        "reply_resume_gaps_over64": 0,
++        "reply_resume_gap_tokens_over64": 0,
++        "reply_resume_gap_median": null,
++        "reply_resume_gap_max": null
++      }
++    }
++  },
++  "speed": {
++    "speed-base": {
++      "source": "speed-base/2026-10-30-community-rtx-2080-local-model/results.json",
++      "failures": [],
++      "skipped": {},
++      "chat": {
++        "prompt_tokens": 420,
++        "read_tokens": 420,
++        "reused_tokens": 0,
++        "generated_tokens": 900,
++        "prompt_ms": 5503.3,
++        "decode_ms": 15640.9,
++        "requests": 9,
++        "prefill_tps": 76.31784565624261,
++        "decode_tps": 57.541445824728754,
++        "prefix_token_hit_pct": 0.0,
++        "wall_mean_s": 2.352888888888889,
++        "ttft_mean_s": 0.6397777777777778
++      },
++      "prompts": {
++        "4K": {
++          "prompt_tokens": 12057,
++          "read_tokens": 12057,
++          "reused_tokens": 0,
++          "generated_tokens": 72,
++          "prompt_ms": 18060.7,
++          "decode_ms": 1406.6,
++          "requests": 3,
++          "prefill_tps": 667.5820981468049,
++          "decode_tps": 51.187260059718476,
++          "prefix_token_hit_pct": 0.0,
++          "wall_mean_s": 6.495666666666667,
++          "ttft_mean_s": 6.049666666666667,
++          "median_prefill_tps": 666.9
++        },
++        "16K": {
++          "prompt_tokens": 48174,
++          "read_tokens": 48174,
++          "reused_tokens": 0,
++          "generated_tokens": 72,
++          "prompt_ms": 54603.3,
++          "decode_ms": 1424.5,
++          "requests": 3,
++          "prefill_tps": 882.2543692414195,
++          "decode_tps": 50.54405054405054,
++          "prefix_token_hit_pct": 0.0,
++          "wall_mean_s": 18.691,
++          "ttft_mean_s": 18.247666666666667,
++          "median_prefill_tps": 881.9
++        },
++        "32K": {
++          "prompt_tokens": 96147,
++          "read_tokens": 96147,
++          "reused_tokens": 0,
++          "generated_tokens": 72,
++          "prompt_ms": 108788.7,
++          "decode_ms": 2126.5,
++          "requests": 3,
++          "prefill_tps": 883.795835413053,
++          "decode_tps": 33.85845285680696,
++          "prefix_token_hit_pct": 0.0,
++          "wall_mean_s": 37.0,
++          "ttft_mean_s": 36.32933333333333,
++          "median_prefill_tps": 884.4
++        }
++      },
++      "conversation_probe": {
++        "hit_pct": {
++          "median": 69.421,
++          "min": 69.264,
++          "max": 69.531,
++          "n": 3
++        },
++        "reread_tokens": {
++          "median": 4,
++          "min": 2,
++          "max": 74,
++          "n": 3
++        },
++        "new_tokens": {
++          "median": 11950,
++          "min": 11950,
++          "max": 11951,
++          "n": 3
++        },
++        "turn_ttft_s": {
++          "median": 5.011,
++          "min": 3.202,
++          "max": 6.364,
++          "n": 15
++        },
++        "last_turn_prompt_tokens": {
++          "median": 12805,
++          "min": 12801,
++          "max": 12832,
++          "n": 3
++        },
++        "turn_decode_tps": {
++          "median": 61.5,
++          "min": 22.2,
++          "max": 67.1,
++          "n": 15
++        },
++        "first_turn_ttft_s": {
++          "median": 2.234,
++          "min": 2.189,
++          "max": 2.52,
++          "n": 3
++        }
++      }
++    },
++    "speed-pages": {
++      "source": "speed-pages/2026-10-30-community-rtx-2080-local-model/results.json",
++      "failures": [],
++      "skipped": {},
++      "chat": {
++        "prompt_tokens": 420,
++        "read_tokens": 420,
++        "reused_tokens": 0,
++        "generated_tokens": 900,
++        "prompt_ms": 5832.5,
++        "decode_ms": 16063.0,
++        "requests": 9,
++        "prefill_tps": 72.0102871838834,
++        "decode_tps": 56.02938429932142,
++        "prefix_token_hit_pct": 0.0,
++        "wall_mean_s": 2.4364444444444446,
++        "ttft_mean_s": 0.6748888888888889
++      },
++      "prompts": {
++        "4K": {
++          "prompt_tokens": 12057,
++          "read_tokens": 12057,
++          "reused_tokens": 0,
++          "generated_tokens": 72,
++          "prompt_ms": 18360.1,
++          "decode_ms": 1539.4,
++          "requests": 3,
++          "prefill_tps": 656.6957696308845,
++          "decode_tps": 46.771469403663765,
++          "prefix_token_hit_pct": 0.0,
++          "wall_mean_s": 6.639666666666667,
++          "ttft_mean_s": 6.150666666666667,
++          "median_prefill_tps": 654.6
++        },
++        "16K": {
++          "prompt_tokens": 48174,
++          "read_tokens": 48174,
++          "reused_tokens": 0,
++          "generated_tokens": 72,
++          "prompt_ms": 55711.6,
++          "decode_ms": 1402.9,
++          "requests": 3,
++          "prefill_tps": 864.7032215911946,
++          "decode_tps": 51.322261030722075,
++          "prefix_token_hit_pct": 0.0,
++          "wall_mean_s": 21.181333333333335,
++          "ttft_mean_s": 18.616333333333333,
++          "median_prefill_tps": 867.2
++        },
++        "32K": {
++          "prompt_tokens": 96147,
++          "read_tokens": 96147,
++          "reused_tokens": 0,
++          "generated_tokens": 72,
++          "prompt_ms": 109126.3,
++          "decode_ms": 1725.2,
++          "requests": 3,
++          "prefill_tps": 881.0616689102443,
++          "decode_tps": 41.73429167632738,
++          "prefix_token_hit_pct": 0.0,
++          "wall_mean_s": 40.60366666666667,
++          "ttft_mean_s": 36.44233333333333,
++          "median_prefill_tps": 881.1
++        }
++      },
++      "conversation_probe": {
++        "hit_pct": {
++          "median": 69.35,
++          "min": 69.237,
++          "max": 69.472,
++          "n": 3
++        },
++        "reread_tokens": {
++          "median": 73,
++          "min": 1,
++          "max": 73,
++          "n": 3
++        },
++        "new_tokens": {
++          "median": 11949,
++          "min": 11947,
++          "max": 11951,
++          "n": 3
++        },
++        "turn_ttft_s": {
++          "median": 5.094,
++          "min": 3.204,
++          "max": 6.346,
++          "n": 15
++        },
++        "last_turn_prompt_tokens": {
++          "median": 12823,
++          "min": 12794,
++          "max": 12835,
++          "n": 3
++        },
++        "turn_decode_tps": {
++          "median": 54.6,
++          "min": 32.9,
++          "max": 62.1,
++          "n": 15
++        },
++        "first_turn_ttft_s": {
++          "median": 2.197,
++          "min": 2.195,
++          "max": 2.271,
++          "n": 3
++        }
++      }
++    }
++  },
++  "allocation_memory": {
++    "ram4-hot1": {
++      "samples": 68,
++      "peak_rss_gib": 48.13142776489258,
++      "peak_hwm_gib": 49.56383514404297,
++      "peak_swap_gib": 0.05991363525390625,
++      "min_host_available_gib": 9.269512176513672,
++      "max_gpu_used_mib": 7606.0
++    },
++    "ram0-hot4": {
++      "samples": 68,
++      "peak_rss_gib": 48.0138053894043,
++      "peak_hwm_gib": 48.19333267211914,
++      "peak_swap_gib": 0.008403778076171875,
++      "min_host_available_gib": 9.868736267089844,
++      "max_gpu_used_mib": 7606.0
++    },
++    "ram2-hot4": {
++      "samples": 66,
++      "peak_rss_gib": 48.194828033447266,
++      "peak_hwm_gib": 49.2955207824707,
++      "peak_swap_gib": 0.015625,
++      "min_host_available_gib": 9.930622100830078,
++      "max_gpu_used_mib": 7606.0
++    }
++  },
++  "checks": {
++    "native_conversation_file": 264,
++    "python_run": 127,
++    "python_passed": 126,
++    "python_skipped": 1,
++    "gpu_code_checks": 62,
++    "long_tool_tasks_passed": 2,
++    "usual_agent_scored_passed": 20
++  },
++  "limits": "Two long-context pairs. One ordinary suite and one restarted coding task per arm. One allocation run per profile. Synchronous saves. Text, serial POSIX only; no HIP/SYCL/Windows validation."
++}
+diff --git a/docs/PERSISTENT_PREFIX_PAGES.md b/docs/PERSISTENT_PREFIX_PAGES.md
+new file mode 100644
+index 0000000..86d5ab4
+--- /dev/null
++++ b/docs/PERSISTENT_PREFIX_PAGES.md
+@@ -0,0 +1,55 @@
++# Persistent prefix pages (local experiment)
++
++A text conversation can resume after the server restarts or its native RAM conversation is evicted. The server selects a compatible saved prefix automatically for Chat Completions, Responses and Messages, using the final token IDs produced by its normal chat template. It first checks the native live/checkpoint/parked cache: RAM wins a tie.
++
++This is an opt-in local branch based on the tested v0.2.7 configuration. It is not an upstream release feature. The native GPU KV allocator and inference kernels are unchanged.
++
++## Enable
++
++Use this branch's rebuilt engine **and** its Python server. For the measured balanced 64 GB profile, set `--conversation-cache-mib 2048 --conversation-cache-slots 1` in `args`, and add these entries to the server config's `env` object:
++
++```json
++{
++  "STRATA_SESSION_PAGED": "1",
++  "STRATA_PREFIX_CACHE_DIR": "/absolute/path/to/private-ssd-cache",
++  "STRATA_SESSION_PAGE_HOT_MIB": "4096",
++  "STRATA_PREFIX_DISK_MIB": "24576",
++  "STRATA_PREFIX_MAX_ENTRIES": "128",
++  "STRATA_PREFIX_MIN_TOKENS": "8192",
++  "STRATA_PREFIX_SAVE_GAIN": "1024",
++  "STRATA_SESSION_ALL_CHECKPOINTS": "1"
++}
++```
++
++Use `--prompt-cache 20 --prompt-cache-every 8192` for a dense checkpoint chain at a 131072-token context capacity. These checkpoint settings consume additional host RAM; use the same settings in a comparison with persistence disabled. The existing native memory floor and conversation-cache budgets still apply. The page cache is an additional bounded host allocation, not borrowed VRAM. Save/restore RAM admission reserves its unfilled budget as well as the native state copies. Default page budget is 256 MiB; zero disables that tier. The initial paired experiment used 1024 MiB; the later balanced profile uses 4096 MiB with `--conversation-cache-mib 2048 --conversation-cache-slots 1`. Its Linux page-cache residency is managed separately by the OS.
++
++Start `python -m serve.server --engine strata --config /path/to/config.json` from this source checkout. Set `STRATA_PREFIX_SAVE_GAIN=0` to save every distinct completed input instead of deferring small changes. Removing `STRATA_PREFIX_CACHE_DIR` disables automatic persistence; no proxy or client-specific session header is required. Existing raw session files remain readable. `STRATA_SESSION_PAGED=1` also selects paged storage for explicit native SAVE commands; use a dedicated private directory.
++
++Cache data contains token IDs and model state derived from prompts. Keep the directory private. Each executable/config identity gets its own subdirectory, lease and quota. Old namespaces do not expire automatically across software upgrades. Stop the owning server before removing an old namespace to reclaim it.
++
++## How it works
++
++1. SHA-256 hashes of exact token prefixes index coherent saved checkpoint boundaries. This is an index hint; the native session reader still validates the model/config identity, complete state, checksums and dimensions before applying anything to the GPU.
++2. A new `CACHEMATCH` native command reports how many input tokens the live/checkpoint/parked state can actually reuse without mutation. Only a strictly deeper disk candidate triggers RESTORE.
++3. The native serializer writes immutable, content-addressed pages up to 2 MiB each. It resets page alignment at each tensor/vector, so identical leading bytes can be shared even when snapshot metadata or lengths differ. Two seeded native hashes name each page; existing bytes are compared before deduplication. These are trusted-cache integrity checks, not authentication.
++4. A bounded native RAM LRU holds serialized pages. SSD is the persistent backing tier. Restore streams pages into the existing validated session parser without assembling another whole temporary file. The parser still materializes the complete validated session image before device transfer.
++5. After successful generation, the server saves a snapshot if it adds enough reusable prefix. An identical request or less than the configured gain since a coherent saved checkpoint skips that write. Cancellation, vision and prefill-only requests are not persisted by this integration.
++6. Quotas count unique referenced page bytes plus manifests. LRU eviction removes manifests and then only unreferenced pages. Native readers/writers and garbage collection share file locks; files and manifests publish through flushed temporary files and atomic renames. Startup collects unreachable pages and interrupted temporary writes.
++
++The recurrent state of this hybrid model cannot be sliced at arbitrary token positions. A history edit reuses the deepest unchanged **saved checkpoint**; the changed suffix is recomputed. Retention is bounded by quotas. A RAM page hit is not a token hit: page read counters include repeated reads of the same page within one restore. Actual reusable token counts come from native RESUME/timings.
++
++## Limits and measurement
++
++Linux/POSIX, one serial native engine per cache namespace, text only. Parallel batching, split/peer engines and automatic vision persistence are not supported here. The feature does not deduplicate active GPU KV blocks, avoid every device-to-host save copy, compress pages, or preserve arbitrary downstream state after a history change. Save/restore remains synchronous under the existing request FIFO; cold requests can be slower because they create the cache. Native disk-space admission conservatively reserves space for a whole logical snapshot, even if sharing would save space.
++
++Compare cold requests, native RAM hits, evicted branches, process restart and edited histories separately. Include save/restore time in wall time and TTFT; measure newly read tokens per prefill second, generated tokens per decode second and task correctness. Keep expert-residency hits separate from prefix-token hits. No production default changes are made by this branch.
++
++Inspired by [oMLX](https://github.com/jundot/omlx/tree/6b413c900352db1382466cf4b7f0825f61a550a9), especially `omlx/cache/paged_ssd_cache.py`, `prefix_cache.py` and `boundary_snapshot_store.py`: persistent content-addressed blocks, bounded hot/cold tiers, and explicit coherent recurrent-state boundaries. This is original Strata-specific code; no MLX implementation was copied.
++
++## Local measured profile
++
++On an RTX 2080 8 GiB / i5-9600K / 64 GB RAM with Swift 1.5 Flash-Next IQ2_XS, two reversed-order 121K-token comparisons reduced cold restart request latency from 144.2 to 10.5 seconds, excluding engine boot. A tool-using coding task with one restart passed in both arms and took 359.9 versus 244.7 seconds including boots, with different output counts. New long snapshots added 9–14 seconds. Ordinary scored agent decode stayed about 60.5 tok/s; continuous coding without SSD restores incurred write overhead. This is not a general decode improvement.
++
++A later one-run allocation sweep favored 2048 MiB native parked RAM (one slot) plus 4096 MiB hot pages as a balanced local option: 4.31 seconds to return to an evicted 121K branch, 0.36 seconds for a 5K conversation, 48.2 GiB peak sampled RSS and 16 MiB peak process swap. It served 71.7% of serialized restore bytes from hot pages. Disabling native parking made the short return take 8.79 seconds. These allocation results are exploratory, not repeated estimates or a change to production defaults.
++
++See [the local benchmark record](../bench/results/2026-10-30-persistent-prefix-pages/README.md).
+diff --git a/include/strata/core/conversation_file.hpp b/include/strata/core/conversation_file.hpp
+index 75d01d1..34dfd58 100644
+--- a/include/strata/core/conversation_file.hpp
++++ b/include/strata/core/conversation_file.hpp
+@@ -140,8 +140,13 @@ using SessionPhase = std::function<void(const char* phase, uint64_t bytes)>;
+ // 4 MiB (a slow disk or network folder at 4 MiB/s), at most an hour.  1.2 GB: 345 s.
+ int64_t session_phase_limit_s(uint64_t bytes);
+ 
++// Additional possible host allocation by the paged adapter (unfilled hot budget and bounded staging overhead).
++// Callers add this to their native session admission only for paged operations. Invalid settings return UINT64_MAX.
++uint64_t session_page_cache_reserve_bytes() noexcept;
++
+ // Optional knobs of a write.
+ struct SessionWriteOptions {
++    bool paged = false;            // opt-in shared immutable pages + manifest (Linux); legacy bytes unchanged otherwise
+     // the free-space PREFLIGHT: refused when the disk has less than the new file plus this many bytes free before the
+     // write starts.  Not a reservation: other writers can take the space afterwards.
+     uint64_t min_free_bytes = 0;
+diff --git a/include/strata/core/session_pages.hpp b/include/strata/core/session_pages.hpp
+new file mode 100644
+index 0000000..37e4a39
+--- /dev/null
++++ b/include/strata/core/session_pages.hpp
+@@ -0,0 +1,235 @@
++#pragma once
++// Linux-only opt-in shared page storage for native session serialization. Page boundaries are reset at each
++// tensor, so identical leading KV bytes share objects across branches of different lengths. The serializer still
++// verifies the complete native session before any device write. This is trusted-cache integrity, not authentication.
++#include "strata/core/conversation_file.hpp"
++#include <algorithm>
++#include <cerrno>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <filesystem>
++#include <list>
++#include <memory>
++#include <mutex>
++#include <stdexcept>
++#include <unordered_map>
++#ifndef _WIN32
++#include <fcntl.h>
++#include <sys/file.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#endif
++namespace strata::core::session_pages {
++constexpr size_t page_bytes = 2u << 20;
++constexpr char magic[8] = {'S','T','R','P','A','G','E','1'};
++struct Ref { uint64_t bytes = 0, a = 0, b = 0; };
++inline std::string name(const Ref& r) {
++    char s[40]; std::snprintf(s, sizeof(s), "%016llx%016llx.blk", (unsigned long long)r.a, (unsigned long long)r.b);
++    return s;
++}
++inline Ref identify(const uint8_t* p, size_t n) {
++    return {n, session_hash64(p,n,0x5041474531ull), session_hash64(p,n,0x5041474532ull)};
++}
++class Failure : public std::runtime_error {
++public:
++    SessionError kind;
++    Failure(const std::string& s,SessionError k):std::runtime_error("paged session: "+s),kind(k) {}
++};
++inline void fail(const std::string& s) { throw Failure(s,SessionError::invalid); }
++inline void io_fail(const std::string& s,int code=errno) {
++    const bool storage=code==ENOSPC || code==EFBIG
++#ifdef EDQUOT
++        || code==EDQUOT
++#endif
++        ;
++    const auto kind=code==ENOMEM ? SessionError::memory : storage ? SessionError::storage : SessionError::io;
++    throw Failure(s+": "+std::strerror(code),kind);
++}
++inline void inject(const std::function<int(const char*)>& fault,const char* step) {
++    if(fault) {const int e=fault(step);if(e)io_fail(step,e);}
++}
++#ifndef _WIN32
++struct Fd {
++    int value = -1;
++    explicit Fd(int x = -1): value(x) {}
++    ~Fd() { if(value >= 0) ::close(value); }
++    Fd(const Fd&) = delete; Fd& operator=(const Fd&) = delete;
++};
++inline void write_all(int fd, const uint8_t* p, size_t n) {
++    while(n) { auto z=::write(fd,p,n); if(z<0 && errno==EINTR)continue;
++        if(z<=0)io_fail("write");
++        p+=z;n-=z; }
++}
++inline std::vector<uint8_t> read_file(const std::filesystem::path& p, size_t maximum) {
++    Fd fd(::open(p.c_str(),O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC));
++    if(fd.value<0)io_fail("open " + p.filename().string());
++    struct stat st{};
++    if(::fstat(fd.value,&st) || !S_ISREG(st.st_mode) || st.st_nlink!=1 || st.st_size<0 || uint64_t(st.st_size)>maximum)
++        fail("invalid file " + p.filename().string());
++    std::vector<uint8_t> out(size_t(st.st_size)); size_t at=0;
++    while(at<out.size()) { auto z=::read(fd.value,out.data()+at,out.size()-at); if(z<0&&errno==EINTR)continue;
++        if(z<=0)io_fail("short read",z<0?errno:EIO);
++        at+=z; }
++    return out;
++}
++inline void sync_dir(const std::filesystem::path& p) {
++    Fd fd(::open(p.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC));
++    if(fd.value<0 || (::fsync(fd.value) && errno!=EINVAL))io_fail("directory flush");
++}
++inline void atomic_file(const std::filesystem::path& path, const std::vector<uint8_t>& bytes, bool durable, const std::function<int(const char*)>& fault={}) {
++    std::string pattern=(path.parent_path()/".page-tmp-XXXXXX").string();
++    std::vector<char> tmp(pattern.begin(),pattern.end());tmp.push_back(0);
++    Fd fd(::mkstemp(tmp.data())); if(fd.value<0)io_fail("create temporary file");
++    try {
++        inject(fault,"write");write_all(fd.value,bytes.data(),bytes.size());
++        if(durable) {inject(fault,"file_flush");if(::fsync(fd.value))io_fail("file flush");}
++        inject(fault,"rename");if(::rename(tmp.data(),path.c_str()))io_fail("publish");
++    } catch(...) { ::unlink(tmp.data());throw; }
++}
++class Lock {
++    Fd fd_;
++public:
++    Lock(const std::filesystem::path& root, bool write):fd_(::open((root/".pages.lock").c_str(),O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600)) {
++        struct stat st{};
++        if(fd_.value<0 || ::fstat(fd_.value,&st) || !S_ISREG(st.st_mode) || st.st_nlink!=1 || ::flock(fd_.value,write?LOCK_EX:LOCK_SH))io_fail("cache lock");
++    }
++};
++#else
++inline std::vector<uint8_t> read_file(const std::filesystem::path&, size_t) { fail("not enabled on Windows");return {}; }
++inline void sync_dir(const std::filesystem::path&) { fail("not enabled on Windows"); }
++inline void atomic_file(const std::filesystem::path&,const std::vector<uint8_t>&,bool,const std::function<int(const char*)>& = {}) { fail("not enabled on Windows"); }
++class Lock { public: Lock(const std::filesystem::path&,bool) { fail("not enabled on Windows"); } };
++#endif
++inline uint64_t hot_limit() {
++    const char* p=std::getenv("STRATA_SESSION_PAGE_HOT_MIB");
++    if(!p)return 256ull<<20;
++    char* e=nullptr; auto n=std::strtoull(p,&e,10);
++    if(!*p || *e || n>16384)fail("invalid hot-page budget (0..16384 MiB)");
++    return n<<20;
++}
++class HotCache {
++    struct Entry {std::shared_ptr<const std::vector<uint8_t>> data; std::list<std::string>::iterator pos;};
++    std::unordered_map<std::string,Entry> entries_; std::list<std::string> order_; size_t bytes_=0;
++    std::mutex mutex_;
++public:
++    std::shared_ptr<const std::vector<uint8_t>> get(const std::string& key) {
++        std::lock_guard<std::mutex> lock(mutex_);auto i=entries_.find(key);if(i==entries_.end())return {};
++        order_.splice(order_.begin(),order_,i->second.pos);return i->second.data;
++    }
++    void put(const std::string& key,std::shared_ptr<const std::vector<uint8_t>> data) {
++        std::lock_guard<std::mutex> lock(mutex_);const auto cap=hot_limit();if(!cap || data->size()>cap)return;
++        if(entries_.count(key))return;
++        while(bytes_+data->size()>cap && !order_.empty()) {
++            auto k=order_.back();bytes_-=entries_.at(k).data->size();entries_.erase(k);order_.pop_back();
++        }
++        order_.push_front(key);
++        const size_t added=data->size();
++        try {entries_.emplace(key,Entry{std::move(data),order_.begin()});}
++        catch(...) {order_.pop_front();throw;}
++        bytes_+=added;
++    }
++    uint64_t growth() {
++        std::lock_guard<std::mutex> lock(mutex_);const auto cap=hot_limit();return cap>bytes_?cap-bytes_:0;
++    }
++    void clear() {std::lock_guard<std::mutex> lock(mutex_);entries_.clear();order_.clear();bytes_=0;}
++};
++inline HotCache& hot() {static HotCache c;return c;}
++inline std::shared_ptr<const std::vector<uint8_t>> load_page(const std::filesystem::path& root,const Ref& ref,bool& hit) {
++    const auto path=root/"pages"/name(ref);const auto key=path.string();
++    if(std::filesystem::is_symlink(path))fail("page is a symbolic link");
++    if(auto x=hot().get(key)) {if(x->size()!=ref.bytes)fail("page size mismatch");hit=true;return x;}
++    auto data=std::make_shared<std::vector<uint8_t>>(read_file(path,page_bytes));
++    const auto got=identify(data->data(),data->size());
++    if(got.bytes!=ref.bytes || got.a!=ref.a || got.b!=ref.b)fail("page checksum mismatch");
++    hit=false;hot().put(key,data);return data;
++}
++inline void u64(std::vector<uint8_t>& b,uint64_t v) {auto p=reinterpret_cast<const uint8_t*>(&v);b.insert(b.end(),p,p+8);}
++class Writer {
++    std::filesystem::path path_,root_;Lock lock_;
++    std::vector<uint8_t> pending_;std::vector<Ref> refs_;std::vector<int32_t> ids_;std::vector<uint64_t> checkpoints_;
++    uint64_t flags_=0,logical_=0,new_=0,reused_=0;bool durable_;SessionStatus* status_=nullptr;
++    std::function<int(const char*)> fault_;
++    void flush() {
++        if(pending_.empty())return;
++        const Ref ref=identify(pending_.data(),pending_.size());const auto path=root_/"pages"/name(ref);
++        if(std::filesystem::exists(path)) {
++            bool hit=false;auto old=load_page(root_,ref,hit);
++            if(*old!=pending_)fail("page hash collision");
++            reused_+=pending_.size();
++        } else {
++            atomic_file(path,pending_,durable_,fault_);new_+=pending_.size();
++            hot().put(path.string(),std::make_shared<const std::vector<uint8_t>>(pending_));
++        }
++        refs_.push_back(ref);pending_.clear();
++    }
++public:
++    Writer(const std::string& path,const SavedConversation& meta,const SessionWriteOptions& options,SessionStatus* status=nullptr):path_(std::filesystem::absolute(path)),root_(path_.parent_path()),lock_(root_,true),ids_(meta.live.ids),durable_(options.durable),status_(status),fault_(options.fault) {
++        const auto pages=root_/"pages";
++        std::filesystem::create_directory(pages);
++        if(std::filesystem::is_symlink(pages) || !std::filesystem::is_directory(pages))fail("invalid pages directory");
++#ifndef _WIN32
++        ::chmod(pages.c_str(),0700);
++#endif
++        flags_=(meta.cvec?2:0) | (!meta.live.imgs.empty()?1:0);
++        for(const auto& c:meta.checkpoints) {
++            if(!c.imgs.empty())flags_|=1;
++            if(c.ids.size()<=ids_.size() && std::equal(c.ids.begin(),c.ids.end(),ids_.begin()))checkpoints_.push_back(c.ids.size());
++        }
++        pending_.reserve(page_bytes);
++    }
++    void append(const void* p,size_t n) {
++        const auto* s=static_cast<const uint8_t*>(p);logical_+=n;
++        while(n) {size_t k=std::min(n,page_bytes-pending_.size());pending_.insert(pending_.end(),s,s+k);s+=k;n-=k;if(pending_.size()==page_bytes)flush();}
++    }
++    void boundary() {flush();}
++    void finish() {
++        flush();std::vector<uint8_t> b(magic,magic+8);
++        for(auto n:{logical_,uint64_t(refs_.size()),uint64_t(ids_.size()),uint64_t(checkpoints_.size()),flags_})u64(b,n);
++        if(!ids_.empty()) {auto p=reinterpret_cast<const uint8_t*>(ids_.data());b.insert(b.end(),p,p+4*ids_.size());}
++        for(auto n:checkpoints_)u64(b,n);
++        for(const auto& r:refs_) {u64(b,r.bytes);u64(b,r.a);u64(b,r.b);}
++        u64(b,session_hash64(b.data(),b.size(),0x4d414e4946455354ull));
++        if(durable_)sync_dir(root_/"pages");
++        atomic_file(path_,b,durable_,fault_);if(status_)status_->published=true;
++        if(durable_) {inject(fault_,"dir_flush");sync_dir(root_);}
++        std::fprintf(stderr,"strata paged cache: saved logical=%llu new=%llu shared=%llu pages=%zu manifest=%zu\n",(unsigned long long)logical_,(unsigned long long)new_,(unsigned long long)reused_,refs_.size(),b.size());
++    }
++};
++class Reader {
++    std::filesystem::path root_;Lock lock_;std::vector<Ref> refs_;size_t index_=0,offset_=0;
++    uint64_t size_=0,hot_bytes_=0,disk_bytes_=0;
++    std::shared_ptr<const std::vector<uint8_t>> current_;
++public:
++    explicit Reader(const std::string& path):root_(std::filesystem::absolute(path).parent_path()),lock_(root_,false) {
++        auto b=read_file(path,64u<<20);size_t at=8;
++        auto get=[&]() {if(at+8>b.size())fail("short manifest");uint64_t n;std::memcpy(&n,b.data()+at,8);at+=8;return n;};
++        if(b.size()<56 || std::memcmp(b.data(),magic,8))fail("bad manifest");
++        size_=get();auto nr=get(),ni=get(),nc=get();(void)get();
++        if(nr>1048576 || ni>4194304 || nc>65536 || b.size()!=56+ni*4+nc*8+nr*24)fail("manifest bounds");
++        uint64_t sum=0;at+=ni*4+nc*8;
++        for(uint64_t i=0;i<nr;++i) {Ref r{get(),get(),get()};if(!r.bytes || r.bytes>page_bytes || sum>UINT64_MAX-r.bytes)fail("page bounds");sum+=r.bytes;refs_.push_back(r);}
++        auto checksum=get();if(sum!=size_ || checksum!=session_hash64(b.data(),b.size()-8,0x4d414e4946455354ull))fail("manifest checksum/size");
++    }
++    uint64_t size() const {return size_;}
++    long long read_some(uint8_t* dst,size_t n) {
++        size_t done=0;
++        while(done<n && index_<refs_.size()) {
++            if(!current_) {bool hit=false;current_=load_page(root_,refs_[index_],hit);(hit?hot_bytes_:disk_bytes_)+=current_->size();}
++            size_t c=std::min(n-done,current_->size()-offset_);std::memcpy(dst+done,current_->data()+offset_,c);done+=c;offset_+=c;
++            if(offset_==current_->size()){current_.reset();offset_=0;++index_;}
++        }
++        return static_cast<long long>(done);
++    }
++    ~Reader(){std::fprintf(stderr,"strata paged cache: read logical=%llu hot=%llu disk=%llu\n",(unsigned long long)size_,(unsigned long long)hot_bytes_,(unsigned long long)disk_bytes_);}
++};
++inline bool is_manifest(const std::string& path) {
++#ifndef _WIN32
++    Fd fd(::open(path.c_str(),O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC));if(fd.value<0)return false;
++    struct stat st{};if(::fstat(fd.value,&st)||!S_ISREG(st.st_mode)||st.st_nlink!=1)return false;
++    char h[8];return ::read(fd.value,h,8)==8 && std::memcmp(h,magic,8)==0;
++#else
++    return false;
++#endif
++}
++} // namespace strata::core::session_pages
+diff --git a/serve/prefix_pages.py b/serve/prefix_pages.py
+new file mode 100644
+index 0000000..5e801ba
+--- /dev/null
++++ b/serve/prefix_pages.py
+@@ -0,0 +1,264 @@
++"""Opt-in persistent prefix pages for the single native Strata engine.
++
++Native manifests provide exact tokens and coherent hybrid-state boundaries. This layer selects a snapshot only
++when it offers more reuse than the live/native RAM cache. Native restore validates model, config and all bytes.
++The native serializer shares immutable pages; eviction accounts for unique physical bytes, not logical snapshots.
++"""
++from __future__ import annotations
++import array
++from collections import Counter
++import contextlib
++try:
++    import fcntl
++except ImportError:
++    fcntl = None
++import hashlib
++import json
++import logging
++import math
++import os
++import re
++import struct
++import time
++from dataclasses import dataclass
++from pathlib import Path
++
++LOG = logging.getLogger('strata.prefix_pages')
++NAME = re.compile(r'[0-9a-f]{64}\.spg\Z')
++PAGE = re.compile(r'[0-9a-f]{32}\.blk\Z')
++
++@dataclass
++class Entry:
++    path: Path
++    ids: array.array
++    boundaries: tuple[int, ...]
++    flags: int
++    logical: int
++    pages: tuple[str, ...]
++    accessed: float
++
++    def match(self, ids: array.array, cvec: bool) -> int:
++        if self.flags & 1 or bool(self.flags & 2) != cvec:
++            return 0
++        # Check deepest first. array equality uses native integer comparisons, not a Python loop per token.
++        for n in reversed(self.boundaries):
++            if 0 < n < len(ids) and n <= len(self.ids) and self.ids[:n] == ids[:n]:
++                return n
++        return 0
++
++
++def read_manifest(path: Path, accessed: float | None = None) -> Entry:
++    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
++    with os.fdopen(fd, 'rb') as f:
++        st = os.fstat(f.fileno())
++        import stat
++        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or not 56 <= st.st_size <= 64 * 1024**2:
++            raise ValueError('invalid manifest file')
++        b = f.read()
++    if b[:8] != b'STRPAGE1':
++        raise ValueError('not a page manifest')
++    logical, nr, ni, nc, flags = struct.unpack_from('<5Q', b, 8)
++    if nr > 1048576 or ni > 4194304 or nc > 65536 or len(b) != 56 + 4*ni + 8*nc + 24*nr or flags & ~3:
++        raise ValueError('invalid manifest counts')
++    ids = array.array('i'); ids.frombytes(b[48:48+4*ni])
++    import sys
++    if sys.byteorder != 'little': ids.byteswap()
++    at = 48 + 4*ni
++    boundaries = struct.unpack_from(f'<{nc}Q', b, at); at += 8*nc
++    refs = [struct.unpack_from('<3Q', b, at + 24*i) for i in range(nr)]
++    if any(not 0 < n <= 2*1024**2 for n, _, _ in refs) or sum(r[0] for r in refs) != logical:
++        raise ValueError('invalid page sizes')
++    if any(n > ni for n in boundaries): raise ValueError('invalid checkpoint')
++    # Manifest checksum and each page are checked again by the native parser before device state changes.
++    return Entry(path, ids, tuple(sorted(set((*boundaries, ni)))), flags, logical,
++                 tuple(f'{a:016x}{c:016x}.blk' for _, a, c in refs), accessed or st.st_mtime)
++
++
++class PrefixPages:
++    def __init__(self, root: Path, *, max_bytes=16*1024**3, max_entries=128, min_tokens=8192, min_gain=1024):
++        if fcntl is None: raise ValueError("persistent prefix pages currently require Linux/POSIX")
++        self.root = Path(root)
++        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
++        if self.root.is_symlink(): raise ValueError('cache root cannot be a symlink')
++        self.root.chmod(0o700)
++        self.owner = os.open(self.root/'.owner.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
++        try: fcntl.flock(self.owner, fcntl.LOCK_EX | fcntl.LOCK_NB)
++        except BaseException: os.close(self.owner); self.owner = None; raise
++        self.max_bytes, self.max_entries = int(max_bytes), int(max_entries)
++        self.min_tokens, self.min_gain = int(min_tokens), int(min_gain)
++        if min(self.max_bytes, self.max_entries, self.min_tokens, self.min_gain) < 0:
++            self.close(); raise ValueError('cache limits must be nonnegative')
++        self.entries: dict[str, Entry] = {}
++        self.events = []
++        try: access = json.loads((self.root/'access.json').read_text())
++        except (OSError, ValueError): access = {}
++        if not isinstance(access, dict): access = {}
++        access = {k: v for k, v in access.items() if isinstance(v, (int, float)) and math.isfinite(v)}
++        for p in self.root.iterdir():
++            if NAME.fullmatch(p.name):
++                try: self.entries[p.name] = read_manifest(p, access.get(p.name))
++                except (OSError, ValueError, struct.error) as e: self.event('invalid_manifest', name=p.name, error=str(e))
++        self.enforce_quota()
++
++    @classmethod
++    def from_engine(cls, engine):
++        if not getattr(engine, "spawn", None): return None
++        exe, args, cwd, _, given, *_ = engine.spawn
++        env = {**os.environ, **(given or {})}
++        directory = env.get('STRATA_PREFIX_CACHE_DIR')
++        if not directory: return None
++        if not 0 <= int(env.get('STRATA_SESSION_PAGE_HOT_MIB', '256')) <= 16384:
++            raise ValueError('hot page budget must be in 0..16384 MiB')
++        if env.get('STRATA_SESSION_PAGED') != '1':
++            raise ValueError('persistent prefix cache requires STRATA_SESSION_PAGED=1')
++        if any(a in args for a in ('--batch', '--layer-split', '--peer-device')):
++            raise ValueError('persistent prefix pages currently require a single serial engine')
++        # Conservative namespace: pin the executable and engine arguments. Operational profile paths may change
++        # between restarts; the native model/config fingerprint remains the final compatibility authority.
++        identity_args=[]; skip=False
++        for a in args:
++            if skip: skip=False; continue
++            if a == '--expert-profile': skip=True; continue
++            identity_args.append(a)
++        relevant = {k: v for k, v in env.items() if k.startswith('STRATA_') and
++                    not k.startswith(('STRATA_PREFIX_', 'STRATA_SESSION_PAGE_')) and
++                    k not in ('STRATA_DUMP_FIRST_LOGITS', 'STRATA_SESSION_PAGED')}
++        binary = Path(exe)
++        if not binary.is_absolute(): binary = Path(cwd or os.getcwd())/binary
++        with binary.open('rb') as f: digest = hashlib.file_digest(f, 'sha256').hexdigest()
++        namespace = hashlib.sha256(json.dumps([digest, str(Path(cwd or os.getcwd()).resolve()), identity_args, relevant], sort_keys=True).encode()).hexdigest()
++        root = Path(directory).expanduser()
++        if not root.is_absolute(): root = Path(cwd or os.getcwd())/root
++        return cls(root/namespace,
++                   max_bytes=int(env.get('STRATA_PREFIX_DISK_MIB', '16384'))*1024**2,
++                   max_entries=int(env.get('STRATA_PREFIX_MAX_ENTRIES', '128')),
++                   min_tokens=int(env.get('STRATA_PREFIX_MIN_TOKENS', '8192')),
++                   min_gain=int(env.get('STRATA_PREFIX_SAVE_GAIN', '1024')))
++
++    def reindex(self):
++        self.prefixes = {}
++        for entry in self.entries.values():
++            if entry.flags & 1: continue
++            raw = memoryview(entry.ids).cast('B')
++            h = hashlib.sha256(); previous = 0
++            for n in entry.boundaries:
++                h.update(raw[previous*4:n*4]); previous = n
++                self.prefixes.setdefault((bool(entry.flags & 2), n, h.digest()), []).append(entry)
++        self.lengths = sorted({key[1] for key in self.prefixes})
++
++    def best(self, prompt, cvec):
++        raw = memoryview(prompt).cast('B'); h = hashlib.sha256(); previous = 0
++        best = (0, None)
++        for n in self.lengths:
++            if n >= len(prompt): break
++            h.update(raw[previous*4:n*4]); previous = n
++            matches = self.prefixes.get((cvec, n, h.digest()))
++            if matches: best = (n, max(matches, key=lambda e: e.accessed))
++        return best
++
++    def close(self):
++        if getattr(self, 'owner', None) is not None:
++            os.close(self.owner); self.owner = None
++
++    def __del__(self): self.close()
++
++    def event(self, kind, **fields):
++        event = {'event': kind, 'at': time.time(), **fields}
++        self.events.append(event); self.events[:] = self.events[-256:]
++        LOG.info('%s', json.dumps(event))
++        # Server deployments do not always install a logging handler for new modules.
++        print('[strata prefix pages] ' + json.dumps(event), flush=True)
++
++    @contextlib.contextmanager
++    def pages_lock(self):
++        fd = os.open(self.root/'.pages.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
++        try:
++            fcntl.flock(fd, fcntl.LOCK_EX)
++            yield
++        finally: os.close(fd)
++
++    def publish_access(self):
++        tmp = self.root/'.access.tmp'
++        try:
++            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
++            with os.fdopen(fd, 'w') as f: json.dump({k: e.accessed for k, e in self.entries.items()}, f)
++            os.replace(tmp, self.root/'access.json')
++        except OSError as e:
++            # Lost recency is harmless: a full/unwritable disk must not break a usable RAM hit or restored state.
++            self.event('access_write_failed', error=str(e))
++
++    def enforce_quota(self):
++        with self.pages_lock():
++            pages = self.root/'pages'
++            if pages.is_symlink(): raise ValueError('pages folder cannot be a symlink')
++            files = {p.name: p.lstat().st_size for p in pages.iterdir() if PAGE.fullmatch(p.name)} if pages.exists() else {}
++            # Remove invalid manifests too: they are not reachable cache entries, never model files.
++            for p in self.root.iterdir():
++                if NAME.fullmatch(p.name) and p.name not in self.entries: p.unlink()
++            refs = Counter(name for e in self.entries.values() for name in set(e.pages))
++            manifest_bytes = {name: e.path.stat().st_size for name, e in self.entries.items()}
++            physical = sum(files.get(name, 0) for name in refs) + sum(manifest_bytes.values())
++            while self.entries and (len(self.entries) > self.max_entries or physical > self.max_bytes):
++                name = min(self.entries, key=lambda k: self.entries[k].accessed)
++                entry = self.entries.pop(name); entry.path.unlink(missing_ok=True)
++                physical -= manifest_bytes[name]
++                for page in set(entry.pages):
++                    refs[page] -= 1
++                    if not refs[page]:
++                        physical -= files.get(page, 0); del refs[page]
++                self.event('evict', name=name, logical_bytes=entry.logical)
++            reclaimed=0
++            for name, size in files.items():
++                if name not in refs: (pages/name).unlink(); reclaimed += size
++            self.physical_bytes = sum(size for name, size in files.items() if name in refs)
++            self.manifest_bytes = sum(e.path.stat().st_size for e in self.entries.values())
++            self.logical_bytes = sum(e.logical for e in self.entries.values())
++            self.publish_access()
++            # No writer is active while this lock is held: crash-left temporary objects are unreachable.
++            for directory in (self.root, pages):
++                if directory.exists():
++                    for tmp in directory.glob('.page-tmp-*'): tmp.unlink()
++            if reclaimed: self.event('gc', bytes=reclaimed)
++            self.reindex()
++
++    def before(self, ids, cvec, engine):
++        prompt = array.array('i', ids)
++        score, entry = self.best(prompt, cvec)
++        if score < self.min_tokens: self.event('miss', prompt_tokens=len(ids)); return
++        ram = engine.prefix_match(ids, cvec)
++        if ram >= score:
++            entry.accessed=time.time(); self.publish_access(); self.event('ram_preferred', ram_tokens=ram, disk_tokens=score); return
++        t=time.monotonic()
++        try: result=engine.session_file('restore', str(entry.path))
++        except Exception as e:
++            # A native refusal leaves live state intact. A dead/desynchronized engine must propagate to the normal
++            # server recovery path, never be treated as a successful cache miss.
++            if e.__class__.__name__ != 'SessionRefused': raise
++            if getattr(e, 'kind', None) in ('memory', 'storage'):
++                # Transient pressure is not corruption. Retain a valid snapshot for a later request/restart.
++                self.event('restore_deferred', error_kind=e.kind, error=str(e)); return
++            self.entries.pop(entry.path.name, None); entry.path.unlink(missing_ok=True)
++            self.event('restore_refused', error_kind=getattr(e, 'kind', None), error=str(e)); self.enforce_quota(); return
++        entry.accessed=time.time(); self.publish_access()
++        self.event('restore', seconds=time.monotonic()-t, matched_tokens=score, logical_bytes=entry.logical,
++                   native_ms=result.get('ms'))
++
++    def after(self, ids, cvec, engine):
++        if len(ids) < self.min_tokens: return
++        prompt=array.array('i', ids)
++        key=hashlib.sha256(prompt.tobytes() + bytes([cvec])).hexdigest()+'.spg'
++        if key in self.entries:
++            self.entries[key].accessed=time.time(); self.publish_access(); self.event('save_skipped_exact'); return
++        saved, _ = self.best(prompt, cvec)
++        if saved and len(prompt)-saved < self.min_gain:
++            self.event('save_deferred', new_tokens=len(prompt)-saved); return
++        t=time.monotonic(); path=self.root/key
++        try:
++            engine.session_file('save', str(path))
++            self.entries[key]=read_manifest(path, time.time())
++            self.enforce_quota()
++            self.event('save', seconds=time.monotonic()-t, entries=len(self.entries),
++                       logical_bytes=self.logical_bytes, physical_bytes=self.physical_bytes, manifest_bytes=self.manifest_bytes)
++        except Exception as e:
++            if e.__class__.__name__ in ('EngineDied', 'EngineSilent', 'EngineStuck'): raise
++            self.event('save_failed', error=str(e))
+diff --git a/serve/server.py b/serve/server.py
+index 414f723..de4a8d2 100644
+--- a/serve/server.py
++++ b/serve/server.py
+@@ -991,6 +991,8 @@ class StrataEngine:
+     def __init__(self, exe: str, args: list[str], cwd: str | None = None, log: str | None = None,
+                  env: dict | None = None, lazy: bool = False, cpus: list[int] | None = None, _attempt: int = 0):
+         self.spawn = (exe, list(args), cwd, log, env, False, cpus)   # to start it again after it died (issue #27)
++        self._prefix_pages=None
++        self._prefix_pages_initialized=False
+         self.session_save_reclaim = '--session-save-reclaim' in args
+         paths = {k: v for k, v in zip(args, args[1:]) if k in ("--native", "--pack")}
+         self.model_path = paths.get("--native") or paths.get("--pack", "pack/full")
+@@ -2228,7 +2230,38 @@ class StrataEngine:
+                          "tok_s": round(r["generated"] / max(1e-6, now - ft), 1) if ft else None})
+         return view
+ 
++    def prefix_match(self, ids, cvec=True):
++        self.proc.stdin.write(f"CACHEMATCH {int(cvec)} {','.join(str(int(t)) for t in ids)}\n")
++        self.proc.stdin.flush()
++        try: line=self.lines.get(timeout=max(30.0,float(self.silence_s or 0)))
++        except queue.Empty: raise self._silent("persistent-cache RAM query timed out") from None
++        fields=line.split() if isinstance(line,str) else []
++        if len(fields)!=2 or fields[0]!="CACHEMATCH" or not fields[1].isdigit() or int(fields[1])>=len(ids):
++            raise self._silent("unexpected persistent-cache RAM query response")
++        return int(fields[1])
++
+     def generate(self, ids, max_new, sampling, cancel, embeddings=None, prefill_only=False):
++        from serve.prefix_pages import PrefixPages
++        cache=getattr(self,"_prefix_pages",None)
++        if not getattr(self,"_prefix_pages_initialized",False):
++            self._prefix_pages=cache=PrefixPages.from_engine(self)
++            self._prefix_pages_initialized=True
++        if cache is None or embeddings is not None or prefill_only or getattr(self,"batch",0):
++            yield from self._generate_uncached(ids,max_new,sampling,cancel,embeddings,prefill_only)
++            return
++        loaded=str((getattr(self,"info",{}) or {}).get("cvec",0)) not in ("0","","None")
++        cvec=(sampling or {}).get("experimental_speed_projection") is not False if loaded else True
++        cache.before(ids,cvec,self)
++        previous=self.last
++        try:
++            yield from self._generate_uncached(ids,max_new,sampling,cancel,embeddings,prefill_only)
++        finally:
++            # The HTTP parser often closes the generator on EOS before it reads DONE. The inner generator's
++            # finally drains that exact request first; only a newly completed, healthy native state is persisted.
++            if self.last is not previous and not cancel.is_set() and self.alive() and self.last.get("finish")!="nonfinite" and (sampling or {}).get("strata_checkpoint") is not False:
++                cache.after(ids,cvec,self)
++
++    def _generate_uncached(self, ids, max_new, sampling, cancel, embeddings=None, prefill_only=False):
+         """Yields token ids, and None as a heartbeat every 10 s while the engine is quiet (reading a long prompt):
+         the HTTP layer turns it into an SSE comment, which keeps clients' watchdogs calm and notices a client that
+         has gone.  A consumer that stops early (or `cancel`) makes the engine STOP, so it does not run to max_new."""
+@@ -2533,6 +2566,9 @@ class StrataEngine:
+         """End the engine process: STOP + QUIT first (the engine frees its memory itself - unpinning tens of GB can take
+         a while; ENGINE_QUIT_WAIT_S), then terminate (ENGINE_TERM_WAIT_S), then kill (ENGINE_KILL_WAIT_S).  Raises
+         EngineStuck when it still runs after all three."""
++        cache=getattr(self,"_prefix_pages",None)
++        if cache is not None:
++            cache.close();self._prefix_pages=None;self._prefix_pages_initialized=False
+         if self.proc is None:
+             return
+         try:
+diff --git a/serve/test_prefix_pages.py b/serve/test_prefix_pages.py
+new file mode 100644
+index 0000000..d924166
+--- /dev/null
++++ b/serve/test_prefix_pages.py
+@@ -0,0 +1,167 @@
++import array, os, queue, struct, tempfile, threading, unittest
++from pathlib import Path
++from types import SimpleNamespace
++from unittest.mock import patch
++from serve.prefix_pages import PrefixPages, read_manifest
++from serve.server import StrataEngine, SessionRefused
++
++
++def manifest(path, ids, boundaries=(), *, flags=2, pages=None):
++    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
++    (path.parent/'pages').mkdir(exist_ok=True)
++    pages=pages or [(16,1,2)]
++    b=b'STRPAGE1'+struct.pack('<5Q',sum(x[0] for x in pages),len(pages),len(ids),len(boundaries),flags)
++    b+=array.array('i',ids).tobytes()+struct.pack(f'<{len(boundaries)}Q',*boundaries)
++    for n,a,c in pages:
++        b+=struct.pack('<3Q',n,a,c)
++        (path.parent/'pages'/f'{a:016x}{c:016x}.blk').write_bytes(bytes([a%256])*n)
++    path.write_bytes(b+bytes(8))
++
++
++class FakeEngine:
++    def __init__(self, ids=(), boundaries=(), ram=0):
++        self.ids=ids;self.boundaries=boundaries;self.ram=ram;self.calls=[];self.refuse=False;self.refuse_kind='invalid'
++    def prefix_match(self, ids,cvec=True):self.calls.append(('query',list(ids)));return self.ram
++    def session_file(self,action,path):
++        self.calls.append((action,path))
++        if self.refuse:raise SessionRefused(self.refuse_kind,'refused')
++        if action=='save':manifest(path,self.ids,self.boundaries)
++        return {'tokens':len(self.ids),'bytes':16,'ms':1}
++
++
++class PrefixTests(unittest.TestCase):
++    def setUp(self):self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.cache=None
++    def tearDown(self):
++        if self.cache:self.cache.close()
++        self.tmp.cleanup()
++    def start(self,**kw):
++        self.cache=PrefixPages(self.root,min_tokens=2,**kw);return self.cache
++    def seed(self,name='a',ids=range(12),boundaries=(4,8),**kw):
++        path=self.root/(name*64+'.spg');manifest(path,ids,boundaries,**kw);return path
++    def test_exact_boundaries_only(self):
++        e=read_manifest(self.seed())
++        self.assertEqual(e.match(array.array('i',[*range(10),99]),True),8)
++        self.assertEqual(e.match(array.array('i',[*range(12),99]),True),12)
++        self.assertEqual(e.match(array.array('i',range(8)),True),4)
++        self.assertEqual(e.match(array.array('i',[0,1,99,3,4]),True),0)
++        self.assertEqual(e.match(array.array('i',range(13)),False),0)
++    def test_ram_wins_tie(self):
++        self.seed();c=self.start();e=FakeEngine(ram=8);c.before([*range(10),99],True,e)
++        self.assertEqual([x[0] for x in e.calls],['query']);self.assertEqual(c.events[-1]['event'],'ram_preferred')
++    def test_disk_wins_only_when_deeper(self):
++        self.seed();c=self.start();e=FakeEngine(ram=4);c.before([*range(10),99],True,e)
++        self.assertEqual([x[0] for x in e.calls],['query','restore']);self.assertEqual(c.events[-1]['matched_tokens'],8)
++    def test_restart_recovers_index(self):
++        c=self.start();e=FakeEngine(range(12),(4,8));c.after(list(range(10)),True,e);c.close()
++        c=self.start();e.calls=[];c.before([*range(12),13],True,e);self.assertEqual(e.calls[-1][0],'restore')
++    def test_shared_pages_count_once_and_gc_keeps_references(self):
++        a=self.seed('a',pages=[(100,1,2),(30,3,4)]);b=self.seed('b',pages=[(100,1,2),(40,5,6)])
++        c=self.start(max_bytes=10000,max_entries=2);self.assertEqual(c.physical_bytes,170)
++        c.max_entries=1;c.entries[a.name].accessed=0;c.enforce_quota()
++        self.assertFalse(a.exists());self.assertTrue(b.exists());self.assertEqual(c.physical_bytes,140)
++        self.assertTrue((self.root/'pages'/f'{1:016x}{2:016x}.blk').exists())
++    def test_quota_removes_oversized_entry(self):
++        self.seed();c=self.start(max_bytes=1);self.assertFalse(c.entries);self.assertEqual(c.physical_bytes,0)
++    def test_native_refusal_is_a_miss(self):
++        self.seed();c=self.start();e=FakeEngine();e.refuse=True;c.before([*range(12),99],True,e)
++        self.assertFalse(c.entries);self.assertEqual(c.physical_bytes,0)
++    def test_memory_refusal_keeps_valid_snapshot(self):
++        path=self.seed();c=self.start();e=FakeEngine();e.refuse=True;e.refuse_kind='memory'
++        c.before([*range(12),99],True,e)
++        self.assertIn(path.name,c.entries);self.assertTrue(path.exists())
++        self.assertEqual(c.events[-1]['event'],'restore_deferred')
++    def test_invalid_manifest_is_collected(self):
++        p=self.seed();p.write_bytes(b'wrong');c=self.start();self.assertFalse(c.entries);self.assertFalse(p.exists())
++    def test_two_owners_are_rejected(self):
++        self.start()
++        with self.assertRaises(BlockingIOError):PrefixPages(self.root)
++    def test_symlink_manifest_is_not_read(self):
++        outside=self.root/'outside';outside.write_text('private');(self.root/('a'*64+'.spg')).symlink_to(outside)
++        c=self.start();self.assertFalse(c.entries);self.assertEqual(outside.read_text(),'private')
++    def test_images_are_not_candidates(self):
++        self.seed(flags=3);c=self.start();e=FakeEngine();c.before([*range(12),99],True,e);self.assertFalse(e.calls)
++    def test_exact_request_not_saved_twice(self):
++        c=self.start();e=FakeEngine(range(12),(4,8));c.after(list(range(10)),True,e)
++        e.calls=[];c.after(list(range(10)),True,e);self.assertFalse(e.calls)
++    def test_changed_same_length_history_is_saved(self):
++        c=self.start(min_gain=1);e=FakeEngine(range(12),(4,8));c.after(list(range(10)),True,e);e.calls=[];c.after([*range(9),99],True,e)
++        self.assertEqual(e.calls[0][0],'save');self.assertEqual(len(c.entries),2)
++    def test_small_append_defers_save(self):
++        self.seed();c=self.start(min_gain=10);e=FakeEngine();c.after([*range(12),99],True,e);self.assertFalse(e.calls)
++    def test_small_history_edit_defers_to_coherent_checkpoint(self):
++        self.seed();c=self.start(min_gain=4);e=FakeEngine();c.after([*range(9),99],True,e)
++        self.assertFalse(e.calls);self.assertEqual(c.events[-1]['new_tokens'],2)
++    def test_index_handles_multiple_branches_and_cvec(self):
++        import random
++        rng=random.Random(42)
++        for i in range(12):
++            ids=[*range(32),i,*range(33,96)]
++            self.seed(name=format(i,'x'),ids=ids,boundaries=(8,32,48,64,80),flags=2 if i%2 else 0)
++        c=self.start()
++        for i in range(150):
++            branch=rng.randrange(12);n=rng.randrange(5,100);cv=bool(rng.randrange(2))
++            ids=array.array('i',([*range(32),branch,*range(33,96),99])[:n])
++            expected=max(e.match(ids,cv) for e in c.entries.values())
++            self.assertEqual(c.best(ids,cv)[0],expected)
++    def test_crash_left_temporary_files_collected(self):
++        self.seed();a=self.root/'.page-tmp-old';b=self.root/'pages/.page-tmp-old'
++        a.write_text('orphan');b.write_text('orphan');self.start()
++        self.assertFalse(a.exists());self.assertFalse(b.exists())
++    def test_corrupt_access_metadata_is_only_a_lru_miss(self):
++        self.seed();(self.root/'access.json').write_text('[]');c=self.start()
++        self.assertEqual(c.best(array.array('i',range(13)),True)[0],12)
++    def test_lru_write_failure_does_not_break_ram_hit(self):
++        self.seed();c=self.start();e=FakeEngine(ram=12)
++        with patch('serve.prefix_pages.os.replace',side_effect=OSError('disk full')):
++            c.before([*range(12),99],True,e)
++        self.assertEqual([x[0] for x in e.calls],['query'])
++        self.assertEqual(c.events[-1]['event'],'ram_preferred')
++    def test_namespace_is_stable_for_profiles_but_scopes_relative_model_paths(self):
++        binary=self.root/'engine';binary.write_bytes(b'fake executable')
++        def open_cache(cwd,profile):
++            env={'STRATA_SESSION_PAGED':'1','STRATA_PREFIX_CACHE_DIR':str(self.root/'cache')}
++            engine=SimpleNamespace(spawn=(str(binary),['--pack','pack/model','--expert-profile',profile],str(cwd),None,env))
++            return PrefixPages.from_engine(engine)
++        a=open_cache(self.root/'model-a','one.profile');first=a.root;a.close()
++        b=open_cache(self.root/'model-a','two.profile');self.assertEqual(first,b.root);b.close()
++        c=open_cache(self.root/'model-b','two.profile');self.assertNotEqual(first,c.root);c.close()
++    def test_disabled_does_not_read_binary(self):
++        e=SimpleNamespace(spawn=('missing',[],None,None,{}))
++        with patch.dict(os.environ,{},clear=True):self.assertIsNone(PrefixPages.from_engine(e))
++
++
++class GeneratorTests(unittest.TestCase):
++    def fake(self):
++        e=StrataEngine.__new__(StrataEngine);e._last={};e.batch=0;e._prefix_pages_initialized=True;calls=[]
++        e._prefix_pages=SimpleNamespace(before=lambda *a:calls.append('before'),after=lambda *a:calls.append('after'));e.alive=lambda:True
++        def inner(*args):
++            try:yield 42;yield 7
++            finally:e.last={'finish':'stop'}
++        e._generate_uncached=inner;return e,calls
++    def test_eos_close_saves_after_drain(self):
++        e,c=self.fake();g=e.generate([1,2],2,{},threading.Event());self.assertEqual(next(g),42);g.close();self.assertEqual(c,['before','after'])
++    def test_cancel_does_not_save(self):
++        e,c=self.fake();cancel=threading.Event();g=e.generate([1,2],2,{},cancel);next(g);cancel.set();g.close();self.assertEqual(c,['before'])
++    def test_failure_does_not_save_old_state(self):
++        e,c=self.fake()
++        def broken(*args):yield 42;raise ValueError('failed')
++        e._generate_uncached=broken;g=e.generate([1,2],2,{},threading.Event());next(g)
++        with self.assertRaises(ValueError):next(g)
++        self.assertEqual(c,['before'])
++    def test_vision_bypasses_text_cache(self):
++        e,c=self.fake();list(e.generate([1,2],2,{},threading.Event(),embeddings='vision'));self.assertEqual(c,[])
++    def test_projection_mode_matches_native_sampling_key(self):
++        e,c=self.fake();modes=[];e.info={'cvec':1}
++        e._prefix_pages.before=lambda ids,cv,engine:modes.append(cv)
++        list(e.generate([1,2],2,{'experimental_speed_projection':False},threading.Event()))
++        e.info={'cvec':0}
++        list(e.generate([1,2],2,{'experimental_speed_projection':False},threading.Event()))
++        self.assertEqual(modes,[False,True])
++    def test_checkpoint_opt_out_skips_persistence(self):
++        e,c=self.fake();list(e.generate([1,2],2,{'strata_checkpoint':False},threading.Event()))
++        self.assertEqual(c,['before'])
++    def test_bad_ram_response_ends_engine(self):
++        e=StrataEngine.__new__(StrataEngine);e.proc=SimpleNamespace(stdin=SimpleNamespace(write=lambda s:None,flush=lambda:None));e.lines=queue.Queue();e.lines.put('CACHEMATCH 999');e.silence_s=1;e._silent=lambda msg:RuntimeError(msg)
++        with self.assertRaises(RuntimeError):e.prefix_match([1,2,3])
++
++if __name__=='__main__':unittest.main()
+diff --git a/src/core/conversation_file.cpp b/src/core/conversation_file.cpp
+index 0b1d023..889770a 100644
+--- a/src/core/conversation_file.cpp
++++ b/src/core/conversation_file.cpp
+@@ -1,4 +1,5 @@
+ #include "strata/core/conversation_file.hpp"
++#include "strata/core/session_pages.hpp"
+ 
+ #include <algorithm>
+ #include <bit>
+@@ -527,13 +528,15 @@ bool free_space(const std::string& path, uint64_t& out) {
+ 
+ class FileSink {
+ public:
+-    explicit FileSink(RawFile& f) : buf_(aligned_block()), f_(f) {}
++    explicit FileSink(RawFile& f) : buf_(aligned_block()), f_(&f) {}
++    explicit FileSink(session_pages::Writer& p) : buf_(aligned_block()), pages_(&p) {}
++    bool boundary() { if(!pages_)return true; if(used_ && !drain())return false; pages_->boundary();return true; }
+     bool ok() const { return buf_ != nullptr; }
+     std::string error() const {
+         if (!buf_) return "out of memory for the write buffer";
+-        return fault_ ? fault_msg_ : f_.error();
++        return fault_ ? fault_msg_ : (f_ ? f_->error() : "paged write failed");
+     }
+-    SessionError kind() const { return buf_ ? (fault_ ? fault_kind_ : f_.kind()) : SessionError::memory; }
++    SessionError kind() const { return buf_ ? (fault_ ? fault_kind_ : (f_ ? f_->kind() : SessionError::io)) : SessionError::memory; }
+     // room in the block for in-place production (avoids a staging copy)
+     uint8_t* span(size_t& room) { room = kBlock - used_; return buf_.get() + used_; }
+     bool commit(size_t n) { used_ += n; total_ += n; return used_ < kBlock || drain(); }
+@@ -551,17 +554,18 @@ public:
+     }
+     // last block padded to the alignment for direct I/O, then the file cut back to its exact size and flushed
+     bool finish(bool durable) {
+-        if (!f_.is_open()) return false;
+-        if (fault_) { f_.close(); return false; }
+-        const size_t padded = f_.direct() ? (used_ + kAlign - 1) / kAlign * kAlign : used_;
++        if(pages_) { if(used_ && !drain())return false;pages_->finish();return true; }
++        if (!f_->is_open()) return false;
++        if (fault_) { f_->close(); return false; }
++        const size_t padded = f_->direct() ? (used_ + kAlign - 1) / kAlign * kAlign : used_;
+         std::memset(buf_.get() + used_, 0, padded - used_);
+-        bool ok = f_.write_all(buf_.get(), padded);
++        bool ok = f_->write_all(buf_.get(), padded);
+         if (ok && used_ && progress) (*progress)(total_, expected);   // the last, partial block
+-        ok = ok && (padded == used_ || f_.truncate(total_));
++        ok = ok && (padded == used_ || f_->truncate(total_));
+         if (ok && durable && phase) phase("flush", total_);
+         if (ok && durable && flush_fault) { fail_with(flush_fault); ok = false; }
+-        ok = ok && (!durable || f_.sync());
+-        ok = f_.close() && ok;
++        ok = ok && (!durable || f_->sync());
++        ok = f_->close() && ok;
+         return ok;
+     }
+     std::optional<Ticker> progress;
+@@ -572,13 +576,15 @@ private:
+     void fail_with(int e) { fault_ = true; fault_kind_ = errno_kind(e); fault_msg_ = std::strerror(e); }
+     bool drain() {
+         if (write_fault) { fail_with(write_fault); return false; }
+-        if (!f_.write_all(buf_.get(), used_)) return false;
++        if(pages_)pages_->append(buf_.get(),used_);
++        else if (!f_->write_all(buf_.get(), used_)) return false;
+         used_ = 0;
+         if (progress) (*progress)(total_, expected);
+         return true;
+     }
+     Aligned buf_;
+-    RawFile& f_;
++    RawFile* f_ = nullptr;
++    session_pages::Writer* pages_ = nullptr;
+     bool fault_ = false;
+     SessionError fault_kind_ = SessionError::io;
+     std::string fault_msg_;
+@@ -588,10 +594,11 @@ private:
+ 
+ class FileSource {
+ public:
+-    explicit FileSource(RawFile& f) : buf_(aligned_block()), f_(f) {}
++    explicit FileSource(RawFile& f) : buf_(aligned_block()), f_(&f) {}
++    explicit FileSource(session_pages::Reader& p) : buf_(aligned_block()), pages_(&p) {}
+     bool ok() const { return buf_ != nullptr; }
+-    std::string error() const { return buf_ ? f_.error() : std::string("out of memory for the read buffer"); }
+-    SessionError kind() const { return buf_ ? f_.kind() : SessionError::memory; }
++    std::string error() const { return buf_ ? (f_ ? f_->error() : "paged read failed") : std::string("out of memory for the read buffer"); }
++    SessionError kind() const { return buf_ ? (f_ ? f_->kind() : SessionError::io) : SessionError::memory; }
+     bool read(void* p, size_t n) {
+         uint8_t* d = static_cast<uint8_t*>(p);
+         while (n) {
+@@ -608,11 +615,11 @@ private:
+     bool fill() {
+         at_ = have_ = 0;
+         while (have_ < kBlock) {
+-            const long long r = f_.read_some(buf_.get() + have_, kBlock - have_);
++            const long long r = pages_ ? pages_->read_some(buf_.get() + have_, kBlock - have_) : f_->read_some(buf_.get() + have_, kBlock - have_);
+             if (r < 0) return false;
+             if (r == 0) break;
+             have_ += (size_t) r;
+-            if (f_.direct() && have_ % kAlign) break;   // short aligned read: end of file
++            if (f_ && f_->direct() && have_ % kAlign) break;   // short aligned read: end of file
+         }
+         const uint64_t before = total_;
+         total_ += have_;
+@@ -620,7 +627,8 @@ private:
+         return have_ > 0;
+     }
+     Aligned buf_;
+-    RawFile& f_;
++    RawFile* f_ = nullptr;
++    session_pages::Reader* pages_ = nullptr;
+     size_t at_ = 0, have_ = 0;
+     uint64_t total_ = 0;
+ };
+@@ -643,16 +651,21 @@ struct Out {
+     }
+     void u64(uint64_t v) { raw(&v, 8); }
+     void i64(int64_t v) { raw(&v, 8); }
+-    template<class T> void vec(const std::vector<T>& v) { u64(v.size()); raw(v.data(), v.size() * sizeof(T)); }
++    template<class T> void vec(const std::vector<T>& v) {
++        u64(v.size()); if(f && ok)ok=f->boundary(); raw(v.data(), v.size()*sizeof(T));if(f && ok)ok=f->boundary();
++    }
+     void buffer(const ConversationBuffer& b) {
+         u64(b.size());
++        if(f && ok)ok=f->boundary();
+         b.visit(0, b.size(), [&](const uint8_t* p, size_t c, size_t) { raw(p, c); return ok; });
++        if(f && ok)ok=f->boundary();
+     }
+     // a K/V part pulled from its owner straight into the file block (sizing pass: counted, never read)
+     void source(const SessionKvSource& s, size_t part) {
+         const size_t size = s.sizes[part];
+         u64(size);
+         if (!f) { count(size); return; }
++        if(ok)ok=f->boundary();
+         for (size_t at = 0; at < size && ok;) {
+             size_t room = 0;
+             uint8_t* d = f->span(room);
+@@ -668,6 +681,7 @@ struct Out {
+             ok = ok && f->commit(c);
+             at += c;
+         }
++        if(ok)ok=f->boundary();
+     }
+     bool read_failed = false;
+     std::string read_error;
+@@ -1017,6 +1031,11 @@ uint64_t session_read_max_file_bytes(const SessionReadLimits& l) {
+     return std::min(n, l.max_file_bytes);
+ }
+ 
++uint64_t session_page_cache_reserve_bytes() noexcept {
++    try {return session_pages::hot().growth() + 2*session_pages::page_bytes + (1u<<20);}
++    catch(...) {return UINT64_MAX;}
++}
++
+ uint64_t session_read_peak_bytes(uint64_t file_bytes) {
+     const uint64_t segments = file_bytes / kBlock + 1;
+     // the parsed image (about the payload), the read buffer, a page per buffer segment, the small vectors
+@@ -1051,6 +1070,23 @@ bool write_impl(const std::string& path, const SavedConversation& image, const s
+             return false;
+         }
+     }
++    if(opt.paged) {
++        session_pages::Writer pages(path,image,opt,&st);
++        FileSink f(pages);
++        if(!f.ok()) {st.error=SessionError::memory;error="paged session: write buffer allocation";return false;}
++        if(opt.progress)f.progress.emplace(opt.progress);
++        f.expected=total;
++        if(f.progress)(*f.progress)(0,total);
++        uint8_t h[kHeader];header_bytes(h,id,payload);
++        bool ok=f.write(h,kHeader);SessionHasher hash(0);Out out;out.f=&f;out.hash=&hash;
++        if(ok)put_payload(out,image,sources);
++        ok=ok && out.ok && out.n==payload;
++        if(ok) {auto ph=hash.digest();ok=f.write(&ph,8) && f.write(kEnd,8);}
++        if(!ok) {error="paged session: source/serialization failure " + out.read_error;return false;}
++        if(opt.phase)opt.phase("publish",total);
++        if(!f.finish(opt.durable)){error=f.error();return false;}
++        bytes=size_t(total);st.error=SessionError::none;st.published=true;return true;
++    }
+     Publisher pub;
+     if (!pub.open(path, error)) { st.error = pub.kind(); return false; }
+     RawFile raw;
+@@ -1111,6 +1147,10 @@ bool write_guarded(const std::string& path, const SavedConversation& image, cons
+         error = "session file: out of memory while writing " + path;
+         st.error = SessionError::memory;
+         ok = false;
++    } catch (const session_pages::Failure& e) {
++        error=e.what();st.error=e.kind;ok=false;
++    } catch (const std::exception& e) {
++        error=e.what();st.error=SessionError::io;ok=false;
+     }
+     if (status) *status = st;
+     return ok;
+@@ -1183,8 +1223,10 @@ bool read_impl(const std::string& path, const SessionFileIdentity& id, SavedConv
+     st = {};
+     st.error = SessionError::invalid;   // every refusal below, unless the step says otherwise
+     RawFile raw;
++    std::unique_ptr<session_pages::Reader> pages;
+     uint64_t size = 0;
+-    if (!raw.open_session(path, size)) {
++    if(session_pages::is_manifest(path)) {pages=std::make_unique<session_pages::Reader>(path);size=pages->size();}
++    if (!pages && !raw.open_session(path, size)) {
+         st.error = raw.refused() ? SessionError::invalid : raw.kind();
+         error = "session file: " + path + ": " + raw.error();
+         return false;
+@@ -1196,7 +1238,8 @@ bool read_impl(const std::string& path, const SessionFileIdentity& id, SavedConv
+                 (max_size == UINT64_MAX ? std::string() : " of " + std::to_string(max_size));
+         return false;
+     }
+-    FileSource f(raw);
++    auto input = pages ? std::make_unique<FileSource>(*pages) : std::make_unique<FileSource>(raw);
++    FileSource& f=*input;
+     if (!f.ok()) { st.error = SessionError::memory; error = "session file: " + f.error(); return false; }
+     // installed before the first block (the header's) is read: every block reports, the first one included
+     if (limits.progress) f.progress.emplace(limits.progress);
+@@ -1221,7 +1264,7 @@ bool read_impl(const std::string& path, const SessionFileIdentity& id, SavedConv
+     }
+     if (limits.admit) {
+         std::string why;
+-        if (!limits.admit(session_read_peak_bytes(size), why)) {
++        if (!limits.admit(sat_add(session_read_peak_bytes(size),pages ? session_page_cache_reserve_bytes() : 0), why)) {
+             st.error = SessionError::memory;
+             error = "session file: " + why;
+             return false;
+@@ -1254,6 +1297,10 @@ bool session_file_read(const std::string& path, const SessionFileIdentity& id, S
+         error = "session file: out of memory while reading " + path;
+         st.error = SessionError::memory;
+         ok = false;
++    } catch (const session_pages::Failure& e) {
++        error=e.what();st.error=e.kind;ok=false;
++    } catch (const std::exception& e) {
++        error=e.what();st.error=SessionError::io;ok=false;
+     }
+     if (status) *status = st;
+     return ok;
+diff --git a/src/core/conversation_file_test.cpp b/src/core/conversation_file_test.cpp
+index 97e651a..6868a3a 100644
+--- a/src/core/conversation_file_test.cpp
++++ b/src/core/conversation_file_test.cpp
+@@ -1,6 +1,7 @@
+ // CPU-only tests for the on-disk session format (include/strata/core/conversation_file.hpp).
+ // Built with -DSTRATA_BUILD_CONVERSATION_TESTS=ON; no CUDA, no model.
+ #include "strata/core/conversation_file.hpp"
++#include "strata/core/session_pages.hpp"
+ #include "strata/core/session_save_reclaim.hpp"
+ 
+ #include <array>
+@@ -781,6 +782,82 @@ int main() {
+     }
+ #endif
+ 
++#ifndef _WIN32
++    // Shared storage is a byte-exact adapter, including across differently-sized branches. Native corruption,
++    // model identity and allocation checks still run before the destination image is replaced.
++    {
++        auto root=dir/"paged";fs::create_directory(root);auto path=root/"first.spg";
++        SessionWriteOptions opt;opt.paged=true;
++        SessionStatus status;
++        auto physical=[&]() {uint64_t n=0;for(const auto& p:fs::directory_iterator(root/"pages"))n+=p.file_size();return n;};
++        check(session_file_write(path.string(),original,id,written,error,opt,&status),"paged: write");
++        check(status.published && written==image.size(),"paged: logical size and publication");
++        SavedConversation restored;
++        check(session_file_read(path.string(),id,restored,written,error) && same(original,restored),"paged: round trip");
++        {
++            session_pages::Reader reader(path.string());std::vector<char> raw(reader.size());
++            check(reader.read_some(reinterpret_cast<uint8_t*>(raw.data()),raw.size())==static_cast<long long>(raw.size()) && raw==image,"paged: native serialization bytes identical");
++        }
++        auto first=physical();
++        check(session_file_write((root/"duplicate.spg").string(),original,id,written,error,opt),"paged: duplicate write");
++        check(physical()==first,"paged: identical snapshots add zero page bytes");
++        auto branch=sample();branch.live.ids.push_back(2000);branch.live.gdn[30]^=7;
++        branch.kv[0].k=pattern((18u<<20)+137,0);
++        check(session_file_write((root/"branch.spg").string(),branch,id,written,error,opt),"paged: longer branch");
++        check(physical()-first < (4u<<20),"paged: changed lengths retain shared leading tensor pages");
++        session_pages::hot().clear();
++        check(session_file_read((root/"branch.spg").string(),id,restored,written,error) && same(branch,restored),"paged: cold restore with no hot pages");
++        SessionFileIdentity wrong=id;++wrong.model;
++        check(!session_file_read(path.string(),wrong,restored,written,error) && same(branch,restored),"paged: wrong model leaves destination intact");
++        const auto manifest=slurp(path);auto bad=manifest;bad.back()^=1;spit(path,bad);
++        check(!session_file_read(path.string(),id,restored,written,error) && same(branch,restored),"paged: bad manifest leaves destination intact");spit(path,manifest);
++        fs::path page;for(const auto& p:fs::directory_iterator(root/"pages"))if(p.file_size()>1000000){page=p.path();break;}
++        check(!page.empty(),"paged: large data page exists");
++        const auto page_data=slurp(page);auto corrupt=page_data;corrupt[0]^=1;spit(page,corrupt);session_pages::hot().clear();
++        check(!session_file_read(path.string(),id,restored,written,error) && same(branch,restored),"paged: corrupt page leaves destination intact");
++        spit(page,page_data);session_pages::hot().clear();
++        check(session_file_read(path.string(),id,restored,written,error) && same(original,restored),"paged: recovered data reads");
++        // Missing and linked objects fail closed; they cannot hang the engine or silently poison KV.
++        fs::remove(page);session_pages::hot().clear();
++        check(!session_file_read(path.string(),id,restored,written,error) && same(original,restored),"paged: missing page leaves destination intact");
++        auto target=root/"target.blk";spit(target,page_data);fs::create_symlink(target,page);
++        check(!session_file_read(path.string(),id,restored,written,error),"paged: linked page rejected");fs::remove(page);spit(page,page_data);
++        // Source failure before the manifest commit keeps the previous complete snapshot usable.
++        auto meta=sample();meta.kv.clear();SessionKvSource source;source.sizes[0]=4u<<20;
++        source.read=[](size_t,size_t,void*,size_t){return false;};
++        check(!session_file_write(path.string(),meta,{source},id,written,error,opt,&status) && !status.published,"paged: source failure before commit");
++        check(slurp(path)==manifest,"paged: source failure preserves previous manifest");
++        for(const char* step:{"write","file_flush","rename","dir_flush"}) {
++            opt.fault=[step](const char* where){return std::strcmp(step,where)==0?ENOSPC:0;};
++            check(!session_file_write(path.string(),original,id,written,error,opt,&status) && status.error==SessionError::storage,
++                  "paged: injected storage failure has the native storage category");
++            check(status.published==(std::strcmp(step,"dir_flush")==0),"paged: failure publication status");
++            check(slurp(path)==manifest,"paged: failed write retains a complete manifest");
++            for(const auto& p:fs::directory_iterator(root))check(p.path().filename().string().rfind(".page-tmp-",0)!=0,"paged: failed write removes its temporary manifest");
++        }
++        opt.fault={};
++        // The hot tier is bounded and immutable; eviction must not affect an in-flight reader's bytes.
++        session_pages::hot().clear();
++        const char* prior=std::getenv("STRATA_SESSION_PAGE_HOT_MIB");
++        const std::string old_limit=prior?prior:"";
++        ::setenv("STRATA_SESSION_PAGE_HOT_MIB","1",1);
++        auto small=std::make_shared<const std::vector<uint8_t>>(700000,42);
++        const auto empty_reserve=session_page_cache_reserve_bytes();
++        session_pages::hot().put("a",small);auto held=session_pages::hot().get("a");
++        check(empty_reserve-session_page_cache_reserve_bytes()==small->size(),"paged: host admission charges only unfilled hot budget");
++        session_pages::hot().put("b",small);
++        check(!session_pages::hot().get("a") && bool(session_pages::hot().get("b")),"paged: hot LRU evicts to byte budget");
++        check(held && held->at(0)==42,"paged: eviction preserves an active reader");
++        session_pages::hot().put("too-large",std::make_shared<const std::vector<uint8_t>>(2u<<20));
++        check(!session_pages::hot().get("too-large"),"paged: oversized hot page bypasses admission");
++        session_pages::hot().clear();::setenv("STRATA_SESSION_PAGE_HOT_MIB","0",1);
++        session_pages::hot().put("disabled",small);
++        check(!session_pages::hot().get("disabled"),"paged: zero budget disables hot tier");
++        if(prior)::setenv("STRATA_SESSION_PAGE_HOT_MIB",old_limit.c_str(),1);
++        else ::unsetenv("STRATA_SESSION_PAGE_HOT_MIB");
++    }
++#endif
++
+     fs::remove_all(dir);
+     std::printf("conversation_file_test: %d checks passed\n", checks);
+     return 0;
+diff --git a/src/program/generate.cpp b/src/program/generate.cpp
+index eeb0843..0200005 100644
+--- a/src/program/generate.cpp
++++ b/src/program/generate.cpp
+@@ -13559,6 +13559,31 @@ int main(int argc, char** argv) {
+             // (fingerprint file, state capture, file flush, rename + folder flush, validation, device transfer):
+             // that step is allowed <seconds> (session_phase_limit_s) by the watchdog and by the server, no more.
+             // (A verifier commit that fails before the command still answers ERR and exits, as for a request.)
++            // Read-only prefix query for persistent tier selection. A hot native entry wins a tie, so the
++            // server never replaces useful RAM state merely because an SSD snapshot exists. Text, serial only.
++            if(line.rfind("CACHEMATCH ",0)==0) {
++                std::istringstream input(line.substr(11));int steer=1;std::string list;
++                bool valid=bool(input>>steer>>list) && (steer==0 || steer==1);
++                std::vector<int32_t> query;
++                size_t at=0;
++                while(valid && at<list.size()) {
++                    char* end=nullptr;errno=0;long value=std::strtol(list.c_str()+at,&end,10);
++                    if(end==list.c_str()+at || errno || value<0 || value>INT32_MAX || (*end && *end!=',')) {valid=false;break;}
++                    query.push_back(int32_t(value));at=size_t(end-list.c_str());if(at<list.size())++at;
++                    if(query.size()>size_t(o.max_context)){valid=false;break;}
++                }
++                int64_t matched=0;
++                const bool cv=strata::kernels::cvec().loaded() ? steer!=0 : true;
++                if(valid && !query.empty() && o.batch<=0 && stages.empty() && !multi_gpu && o.prompt_cache>0) {
++                    auto consider=[&](const std::vector<int32_t>& pre,const std::vector<ImgKey>& imgs) {
++                        if(imgs.empty() && !pre.empty() && pre.size()<query.size() && std::equal(pre.begin(),pre.end(),query.begin()))
++                            matched=std::max<int64_t>(matched,pre.size());
++                    };
++                    if(cvec_cached==cv) {if(live_ok)consider(live,live_imgs);for(const auto& c:checks)consider(c.ids,c.imgs);}
++                    matched=std::max(matched,conversations.best(query,{},cv).tokens);
++                }
++                std::printf("CACHEMATCH %lld\n",(long long)matched);std::fflush(stdout);continue;
++            }
+             if (line.rfind("SAVE ", 0) == 0 || line.rfind("RESTORE ", 0) == 0) {
+                 const bool save = line[0] == 'S';
+                 const std::string path = line.substr(save ? 5 : 8);
+@@ -13618,6 +13643,8 @@ int main(int argc, char** argv) {
+                 }
+                 if (save) {
+                     if (!live_ok || live.empty()) { refuse("no complete session to save"); continue; }
++                    const char* paged_env=std::getenv("STRATA_SESSION_PAGED");
++                    const bool paged_session=paged_env && std::strcmp(paged_env,"1")==0;
+                     size_t bytes = 0, kept = 0;
+                     double capture_ms = 0;
+                     try {
+@@ -13657,6 +13684,10 @@ int main(int argc, char** argv) {
+                             }
+                         }
+                         auto admit = [&](uint64_t need, std::string& why) {
++                            if(paged_session) {
++                                const uint64_t extra=strata::core::session_page_cache_reserve_bytes();
++                                need=need>UINT64_MAX-extra ? UINT64_MAX : need+extra;
++                            }
+                             const auto mem = strata::core::sample_host_memory();
+                             const std::optional<uint64_t> avail = mem ? std::optional<uint64_t>(mem->available) : std::nullopt;
+                             if (strata::core::conversation_memory_admit(avail, need, floor)) return true;
+@@ -13687,6 +13718,7 @@ int main(int argc, char** argv) {
+                         }
+                         capture_ms = ms();
+                         strata::core::SessionWriteOptions wo;
++                        wo.paged=paged_session;
+                         wo.min_free_bytes = (uint64_t) o.session_min_free_mib << 20;
+                         wo.progress = moving;
+                         wo.phase = blocking;

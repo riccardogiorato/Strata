@@ -1,0 +1,24 @@
+profile-base-cold wall 152.02 prefill 800.5 decode 37.9 cached 0
+profile-base-decode wall 31.9 prefill 515.5 decode 52.4 cached 114688
+profile-base-correctness wall 2.75 prefill 20.8 decode 60.5 cached 0
+screen-fused-sm75-cold wall 136.55 prefill 895.7 decode 20.8 cached 0
+screen-fused-sm75-correctness wall 3.09 prefill 18.1 decode 57.1 cached 0
+screen-base wall 187.25 prefill 806.6 decode 55.3 cached 0
+decode-seed wall 150.91 prefill 802.9 decode 24.6 cached 0
+screen-profile-decode wall 42.36 prefill 6.1 decode 49.9 cached 120999
+screen-profile-decode-correctness wall 1.81 prefill 42.2 decode 60.5 cached 0
+screen-base wall 40.72 prefill 7.8 decode 51.7 cached 120999
+screen-base-correctness wall 1.81 prefill 40.4 decode 63.2 cached 0
+screen-gdn-split wall 40.27 prefill 6.4 decode 52.5 cached 120999
+screen-gdn-split-correctness wall 2.01 prefill 34.2 decode 60.9 cached 0
+screen-verify-fusion wall 40.45 prefill 7.7 decode 52.0 cached 120999
+screen-verify-fusion-correctness wall 1.82 prefill 40.7 decode 61.7 cached 0
+screen-overlap wall 41.05 prefill 7.5 decode 51.3 cached 120999
+screen-overlap-correctness wall 1.75 prefill 40.5 decode 67.6 cached 0
+screen-shared-serial wall 40.01 prefill 7.4 decode 52.7 cached 120999
+screen-shared-serial-correctness wall 1.78 prefill 40.6 decode 64.9 cached 0
+tab-cold-base wall 149.17 prefill 815.4 decode 42.7 cached 0
+tab-cold-direct wall 151.11 prefill 804.9 decode 42.8 cached 0
+Checks 12 / 12
+Cold edit {}
+Decode repeat {}

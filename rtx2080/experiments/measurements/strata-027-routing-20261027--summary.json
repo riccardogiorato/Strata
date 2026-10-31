@@ -1,0 +1,816 @@
+{
+  "complete": true,
+  "long": {
+    "cold-edit": {
+      "prod": {
+        "n": 2,
+        "passed": 2,
+        "checks": 2,
+        "wall_mean_s": 168.1716036794969,
+        "wall_runs_s": [
+          167.0761130549945,
+          169.26709430399933
+        ],
+        "ttft_mean_s": 143.33801052149647,
+        "prefill_tps": 855.5887059020815,
+        "decode_tps": 57.59565279427339,
+        "decode_runs_tps": [
+          57.162232239020305,
+          58.03569620560755
+        ],
+        "output_tokens": [
+          1433,
+          1433
+        ],
+        "prompt_tokens": [
+          122451,
+          122451
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "finish_reasons": [
+          "stop",
+          "stop"
+        ]
+      },
+      "off": {
+        "n": 2,
+        "passed": 2,
+        "checks": 2,
+        "wall_mean_s": 168.7373114975053,
+        "wall_runs_s": [
+          168.69025472800422,
+          168.78436826700636
+        ],
+        "ttft_mean_s": 144.1743922740061,
+        "prefill_tps": 850.6495310871832,
+        "decode_tps": 58.24137860960393,
+        "decode_runs_tps": [
+          57.09914052445142,
+          59.4302492918552
+        ],
+        "output_tokens": [
+          1433,
+          1433
+        ],
+        "prompt_tokens": [
+          122451,
+          122451
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "finish_reasons": [
+          "stop",
+          "stop"
+        ]
+      },
+      "on": {
+        "n": 2,
+        "passed": 2,
+        "checks": 2,
+        "wall_mean_s": 163.67807353899116,
+        "wall_runs_s": [
+          161.81847808598832,
+          165.537668991994
+        ],
+        "ttft_mean_s": 144.4043219794985,
+        "prefill_tps": 849.2156868864346,
+        "decode_tps": 74.18624215362712,
+        "decode_runs_tps": [
+          81.27038139798667,
+          68.23809523809524
+        ],
+        "output_tokens": [
+          1433,
+          1433
+        ],
+        "prompt_tokens": [
+          122451,
+          122451
+        ],
+        "cache_tokens": [
+          0,
+          0
+        ],
+        "finish_reasons": [
+          "stop",
+          "stop"
+        ]
+      }
+    },
+    "novel": {
+      "prod": {
+        "n": 2,
+        "passed": 2,
+        "checks": 2,
+        "wall_mean_s": 22.38732317749964,
+        "wall_runs_s": [
+          22.316171044003568,
+          22.45847531099571
+        ],
+        "ttft_mean_s": 14.169832744497398,
+        "prefill_tps": 559.1382508203737,
+        "decode_tps": 53.10227486028107,
+        "decode_runs_tps": [
+          51.72587807832055,
+          54.37250404591973
+        ],
+        "output_tokens": [
+          410,
+          467
+        ],
+        "prompt_tokens": [
+          122526,
+          122526
+        ],
+        "cache_tokens": [
+          114688,
+          114688
+        ],
+        "finish_reasons": [
+          "stop",
+          "stop"
+        ]
+      },
+      "off": {
+        "n": 2,
+        "passed": 2,
+        "checks": 2,
+        "wall_mean_s": 22.137354368496744,
+        "wall_runs_s": [
+          22.864623162997304,
+          21.410085573996184
+        ],
+        "ttft_mean_s": 13.868140704500547,
+        "prefill_tps": 571.3598407948593,
+        "decode_tps": 52.925981900398,
+        "decode_runs_tps": [
+          53.24473878175157,
+          52.54056930034584
+        ],
+        "output_tokens": [
+          484,
+          395
+        ],
+        "prompt_tokens": [
+          122526,
+          122526
+        ],
+        "cache_tokens": [
+          114688,
+          114688
+        ],
+        "finish_reasons": [
+          "stop",
+          "stop"
+        ]
+      },
+      "on": {
+        "n": 2,
+        "passed": 2,
+        "checks": 2,
+        "wall_mean_s": 19.002740521995293,
+        "wall_runs_s": [
+          18.973573594994377,
+          19.031907448996208
+        ],
+        "ttft_mean_s": 13.864559557499888,
+        "prefill_tps": 571.474401038249,
+        "decode_tps": 65.81876609172038,
+        "decode_runs_tps": [
+          69.64845041925254,
+          62.02685261880453
+        ],
+        "output_tokens": [
+          358,
+          322
+        ],
+        "prompt_tokens": [
+          122526,
+          122526
+        ],
+        "cache_tokens": [
+          114688,
+          114688
+        ],
+        "finish_reasons": [
+          "stop",
+          "stop"
+        ]
+      }
+    }
+  },
+  "speed": {
+    "prod": {
+      "short_chat_decode": {
+        "median": 45.8,
+        "min": 43.1,
+        "max": 51.9,
+        "n": 9
+      },
+      "conversation_decode": {
+        "median": 43.3,
+        "min": 23.8,
+        "max": 48.6,
+        "n": 15
+      },
+      "conversation_ttft": {
+        "median": 5.293,
+        "min": 3.239,
+        "max": 6.359,
+        "n": 15
+      },
+      "prompt_tps": {
+        "4K": {
+          "median": 663.1,
+          "min": 662.0,
+          "max": 666.0,
+          "n": 3
+        },
+        "16K": {
+          "median": 870.5,
+          "min": 868.9,
+          "max": 872.4,
+          "n": 3
+        },
+        "32K": {
+          "median": 882.0,
+          "min": 880.1,
+          "max": 883.0,
+          "n": 3
+        }
+      },
+      "failures": [],
+      "skipped": {}
+    },
+    "off": {
+      "short_chat_decode": {
+        "median": 44.1,
+        "min": 40.0,
+        "max": 53.9,
+        "n": 9
+      },
+      "conversation_decode": {
+        "median": 40.6,
+        "min": 26.9,
+        "max": 47.8,
+        "n": 15
+      },
+      "conversation_ttft": {
+        "median": 5.34,
+        "min": 3.236,
+        "max": 6.533,
+        "n": 15
+      },
+      "prompt_tps": {
+        "4K": {
+          "median": 662.4,
+          "min": 661.2,
+          "max": 663.2,
+          "n": 3
+        },
+        "16K": {
+          "median": 871.9,
+          "min": 871.1,
+          "max": 872.0,
+          "n": 3
+        },
+        "32K": {
+          "median": 882.1,
+          "min": 882.0,
+          "max": 882.9,
+          "n": 3
+        }
+      },
+      "failures": [],
+      "skipped": {}
+    },
+    "on": {
+      "short_chat_decode": {
+        "median": 55.6,
+        "min": 47.0,
+        "max": 75.4,
+        "n": 9
+      },
+      "conversation_decode": {
+        "median": 53.5,
+        "min": 31.0,
+        "max": 65.3,
+        "n": 15
+      },
+      "conversation_ttft": {
+        "median": 5.256,
+        "min": 3.201,
+        "max": 6.392,
+        "n": 15
+      },
+      "prompt_tps": {
+        "4K": {
+          "median": 665.2,
+          "min": 660.1,
+          "max": 667.7,
+          "n": 3
+        },
+        "16K": {
+          "median": 870.8,
+          "min": 870.6,
+          "max": 871.1,
+          "n": 3
+        },
+        "32K": {
+          "median": 881.4,
+          "min": 879.7,
+          "max": 882.2,
+          "n": 3
+        }
+      },
+      "failures": [],
+      "skipped": {}
+    }
+  },
+  "agent": {
+    "prod": {
+      "passed": 11,
+      "passed_excluding_task8": 10,
+      "task_wall_seconds": 899,
+      "task_wall_seconds_excluding_task8": 622,
+      "generated_tokens": 32456,
+      "decode_seconds": 683.398,
+      "prompt_read_tokens": 73747,
+      "prompt_seconds": 185.865,
+      "engine_requests": 89,
+      "excluded_warmup": [
+        1556,
+        0,
+        1556,
+        3556,
+        12,
+        331
+      ],
+      "decode_tps": 47.49209099236462,
+      "tasks": [
+        {
+          "task": "task1-js-bugfix",
+          "passed": true,
+          "wall_s": 37,
+          "actual_tool_calls": 7,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1249,
+          "thinking_blocks": 5
+        },
+        {
+          "task": "task10-tb-bank-trans-filter",
+          "passed": true,
+          "wall_s": 105,
+          "actual_tool_calls": 10,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 3605,
+          "thinking_blocks": 9
+        },
+        {
+          "task": "task11-tb-assign-seats",
+          "passed": true,
+          "wall_s": 61,
+          "actual_tool_calls": 8,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 2361,
+          "thinking_blocks": 7
+        },
+        {
+          "task": "task2-react-fix",
+          "passed": true,
+          "wall_s": 55,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1940,
+          "thinking_blocks": 6
+        },
+        {
+          "task": "task3-dep-upgrade",
+          "passed": true,
+          "wall_s": 148,
+          "actual_tool_calls": 18,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 5154,
+          "thinking_blocks": 14
+        },
+        {
+          "task": "task4-python-bugfix",
+          "passed": true,
+          "wall_s": 27,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 752,
+          "thinking_blocks": 5
+        },
+        {
+          "task": "task5-js-to-ts",
+          "passed": true,
+          "wall_s": 40,
+          "actual_tool_calls": 5,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1297,
+          "thinking_blocks": 5
+        },
+        {
+          "task": "task6-extra-code-task",
+          "passed": true,
+          "wall_s": 47,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1788,
+          "thinking_blocks": 5
+        },
+        {
+          "task": "task7-long-context-agent",
+          "passed": true,
+          "wall_s": 55,
+          "actual_tool_calls": 7,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1656,
+          "thinking_blocks": 6
+        },
+        {
+          "task": "task8-tb-broken-python",
+          "passed": true,
+          "wall_s": 277,
+          "actual_tool_calls": 28,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 10841,
+          "thinking_blocks": 19
+        },
+        {
+          "task": "task9-tb-analyze-access-logs",
+          "passed": true,
+          "wall_s": 47,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1813,
+          "thinking_blocks": 6
+        }
+      ],
+      "output_tokens_excluding_task8": 21615,
+      "thinking_blocks": 87
+    },
+    "off": {
+      "passed": 11,
+      "passed_excluding_task8": 10,
+      "task_wall_seconds": 813,
+      "task_wall_seconds_excluding_task8": 699,
+      "generated_tokens": 29209,
+      "decode_seconds": 605.563,
+      "prompt_read_tokens": 62984,
+      "prompt_seconds": 177.657,
+      "engine_requests": 97,
+      "excluded_warmup": [
+        1556,
+        0,
+        1556,
+        3559,
+        12,
+        299
+      ],
+      "decode_tps": 48.234452897551535,
+      "tasks": [
+        {
+          "task": "task1-js-bugfix",
+          "passed": true,
+          "wall_s": 36,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1213,
+          "thinking_blocks": 6
+        },
+        {
+          "task": "task10-tb-bank-trans-filter",
+          "passed": true,
+          "wall_s": 120,
+          "actual_tool_calls": 14,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 4440,
+          "thinking_blocks": 11
+        },
+        {
+          "task": "task11-tb-assign-seats",
+          "passed": true,
+          "wall_s": 101,
+          "actual_tool_calls": 14,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 4014,
+          "thinking_blocks": 11
+        },
+        {
+          "task": "task2-react-fix",
+          "passed": true,
+          "wall_s": 54,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1967,
+          "thinking_blocks": 6
+        },
+        {
+          "task": "task3-dep-upgrade",
+          "passed": true,
+          "wall_s": 114,
+          "actual_tool_calls": 17,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 3882,
+          "thinking_blocks": 14
+        },
+        {
+          "task": "task4-python-bugfix",
+          "passed": true,
+          "wall_s": 33,
+          "actual_tool_calls": 8,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 882,
+          "thinking_blocks": 7
+        },
+        {
+          "task": "task5-js-to-ts",
+          "passed": true,
+          "wall_s": 74,
+          "actual_tool_calls": 7,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 2761,
+          "thinking_blocks": 8
+        },
+        {
+          "task": "task6-extra-code-task",
+          "passed": true,
+          "wall_s": 48,
+          "actual_tool_calls": 6,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1942,
+          "thinking_blocks": 5
+        },
+        {
+          "task": "task7-long-context-agent",
+          "passed": true,
+          "wall_s": 70,
+          "actual_tool_calls": 13,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 2268,
+          "thinking_blocks": 10
+        },
+        {
+          "task": "task8-tb-broken-python",
+          "passed": true,
+          "wall_s": 114,
+          "actual_tool_calls": 15,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 4148,
+          "thinking_blocks": 11
+        },
+        {
+          "task": "task9-tb-analyze-access-logs",
+          "passed": true,
+          "wall_s": 49,
+          "actual_tool_calls": 7,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1692,
+          "thinking_blocks": 8
+        }
+      ],
+      "output_tokens_excluding_task8": 25061,
+      "thinking_blocks": 97
+    },
+    "on": {
+      "passed": 10,
+      "passed_excluding_task8": 9,
+      "task_wall_seconds": 1032,
+      "task_wall_seconds_excluding_task8": 779,
+      "generated_tokens": 45972,
+      "decode_seconds": 762.561,
+      "prompt_read_tokens": 68701,
+      "prompt_seconds": 201.531,
+      "engine_requests": 119,
+      "excluded_warmup": [
+        1556,
+        0,
+        1556,
+        3674,
+        15,
+        463
+      ],
+      "decode_tps": 60.286324635012804,
+      "tasks": [
+        {
+          "task": "task1-js-bugfix",
+          "passed": true,
+          "wall_s": 33,
+          "actual_tool_calls": 9,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1189,
+          "thinking_blocks": 7
+        },
+        {
+          "task": "task10-tb-bank-trans-filter",
+          "passed": true,
+          "wall_s": 42,
+          "actual_tool_calls": 7,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1372,
+          "thinking_blocks": 6
+        },
+        {
+          "task": "task11-tb-assign-seats",
+          "passed": false,
+          "wall_s": 180,
+          "actual_tool_calls": 14,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 9603,
+          "thinking_blocks": 15
+        },
+        {
+          "task": "task2-react-fix",
+          "passed": true,
+          "wall_s": 70,
+          "actual_tool_calls": 5,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 2014,
+          "thinking_blocks": 5
+        },
+        {
+          "task": "task3-dep-upgrade",
+          "passed": true,
+          "wall_s": 120,
+          "actual_tool_calls": 15,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 5104,
+          "thinking_blocks": 14
+        },
+        {
+          "task": "task4-python-bugfix",
+          "passed": true,
+          "wall_s": 30,
+          "actual_tool_calls": 8,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 1038,
+          "thinking_blocks": 7
+        },
+        {
+          "task": "task5-js-to-ts",
+          "passed": true,
+          "wall_s": 81,
+          "actual_tool_calls": 10,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 3356,
+          "thinking_blocks": 10
+        },
+        {
+          "task": "task6-extra-code-task",
+          "passed": true,
+          "wall_s": 98,
+          "actual_tool_calls": 12,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 5010,
+          "thinking_blocks": 11
+        },
+        {
+          "task": "task7-long-context-agent",
+          "passed": true,
+          "wall_s": 71,
+          "actual_tool_calls": 16,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 3010,
+          "thinking_blocks": 10
+        },
+        {
+          "task": "task8-tb-broken-python",
+          "passed": true,
+          "wall_s": 253,
+          "actual_tool_calls": 35,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 11951,
+          "thinking_blocks": 24
+        },
+        {
+          "task": "task9-tb-analyze-access-logs",
+          "passed": true,
+          "wall_s": 54,
+          "actual_tool_calls": 11,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "output_tokens": 2325,
+          "thinking_blocks": 10
+        }
+      ],
+      "output_tokens_excluding_task8": 34021,
+      "thinking_blocks": 119
+    }
+  },
+  "seat_recheck": {
+    "off": {
+      "tasks": [
+        {
+          "model": "seat-recheck-off",
+          "task": "task11-tb-assign-seats",
+          "passed": true,
+          "wall_s": 63,
+          "suspect_garbage_pass": false,
+          "tool_calls": 28,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "raw_passed": true,
+          "actual_tool_calls": 7,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "workdir": "/tmp/agentic-run/strata-027-routing-20261027/seat-recheck-off/task11-tb-assign-seats"
+        }
+      ],
+      "passed": 1,
+      "passed_excluding_task8": 1,
+      "task_wall_seconds": 63,
+      "task_wall_seconds_excluding_task8": 63,
+      "generated_tokens": 2409,
+      "decode_seconds": 50.603,
+      "prompt_read_tokens": 3659,
+      "prompt_seconds": 11.469,
+      "engine_requests": 8,
+      "excluded_warmup": [
+        1556,
+        0,
+        1556,
+        3958,
+        12,
+        295
+      ],
+      "raw_result": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-027-routing-20261027/agent/raw-results/seat-recheck-off-20261027-210110.jsonl"
+    },
+    "on": {
+      "tasks": [
+        {
+          "model": "seat-recheck-on",
+          "task": "task11-tb-assign-seats",
+          "passed": true,
+          "wall_s": 73,
+          "suspect_garbage_pass": false,
+          "tool_calls": 48,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "raw_passed": true,
+          "actual_tool_calls": 15,
+          "immutable_violations": [],
+          "agent_errors": [],
+          "workdir": "/tmp/agentic-run/strata-027-routing-20261027/seat-recheck-on/task11-tb-assign-seats"
+        }
+      ],
+      "passed": 1,
+      "passed_excluding_task8": 1,
+      "task_wall_seconds": 73,
+      "task_wall_seconds_excluding_task8": 73,
+      "generated_tokens": 3547,
+      "decode_seconds": 59.025,
+      "prompt_read_tokens": 3638,
+      "prompt_seconds": 13.049,
+      "engine_requests": 11,
+      "excluded_warmup": [
+        1556,
+        0,
+        1556,
+        3845,
+        15,
+        302
+      ],
+      "raw_result": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-027-routing-20261027/agent/raw-results/seat-recheck-on-20261027-210248.jsonl"
+    }
+  },
+  "seat_recheck_complete": true
+}

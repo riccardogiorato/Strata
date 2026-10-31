@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)"
+if [[ "${1:-}" == serve && $# == 1 ]]; then
+  exec "$ROOT/runtime/venv/bin/python" "$ROOT/rtx2080/manage.py" serve
+fi
+exec "$ROOT/runtime/venv/bin/python" "$ROOT/strata.py" "$@"

@@ -1,0 +1,824 @@
+diff --git a/docs/DETAILS.md b/docs/DETAILS.md
+index 5c5724f121..b50a04d946 100644
+--- a/docs/DETAILS.md
++++ b/docs/DETAILS.md
+@@ -1957,6 +1957,20 @@ the pairs in which the switched arm won). They are here so you can try them on y
+   `tools/batch_test.py --n 16` prompts (solo and batch) were identical too, and to those of a build without the
+   option. The uniform cache (no profile) holds no resident expert when a native pack's prompt is read (serve needs the
+   profile, and a one-shot run fills the cache only while it decodes), so `expert_cache_slot_guard_test` covers it.
++- **`STRATA_MTP_ROOM_MIN=TOKENS` (`--serve`, `--mtp`): the MTP drafter's 512 routed experts are the prompt path's ring
++  while a request that reads TOKENS prompt tokens or more is read** (0: every request). TOKENS counts what the request
++  reads, not the whole prompt: a turn that reuses a cached conversation prefix and reads a few hundred tokens does not
++  take the room. The experts are 708 MB that only the decode reads - `record_rest` is their only reader; a prompt's
++  passes run the draft layer's dense tensors and its K/V - so the prompt path's ring is pointed at those bytes (nothing
++  is freed, nothing is allocated: the block never moves, so the decode's captured graphs stay valid) and the decode's
++  own bytes are back before the first generated token. Measured on the Q8_0 4-way rig: the ring really did take the
++  675 MiB and the decode did not move, but the deeper ring bought no time at 3,080 or 14,859 tokens (it was not what
++  the prompt waited on). On that rig on 2026-10-19 the read threshold was measured: continuations that read 61, 7
++  and 7 tokens skipped the room, and their first token came 0.19-0.24 s sooner (the room's lend and reclaim).
++  Reported by merbanan on an 8 GB RTX 2060 SUPER, where the ring was the limit: +17% / +17% /
++  +23% prompt tokens/s at 4K / 16K / 32K, decode within noise, logits bitwise equal. The same shape the Maya checkout
++  implemented for its DFlash drafter and then for its MTP config's NextN block (local commits `7df369c`, `5ccf9a4`).
++  Details, how to measure it and what it costs: [MTP_PROMPT_ROOM.md](MTP_PROMPT_ROOM.md).
+ 
+ ## Thread placement: `--aux-cpus` (Linux, off by default)
+ 
+diff --git a/docs/MTP_PROMPT_ROOM.md b/docs/MTP_PROMPT_ROOM.md
+new file mode 100644
+index 0000000000..2f3d0857ae
+--- /dev/null
++++ b/docs/MTP_PROMPT_ROOM.md
+@@ -0,0 +1,237 @@
++# The drafter's experts are prompt workspace while a prompt is read (`STRATA_MTP_ROOM_MIN`, opt-in)
++
++Two large VRAM users never work at the same time. The MTP draft layer's 512 routed experts (708 MB, 675 MiB) are read
++only while tokens are **generated**: `record_rest` is their only reader. A prompt's passes - the draft layer's own K/V
++(`record_front`, in both prefill captures) and the prompt path's `Prefill::draft_kv` - run the layer's dense tensors and
++its K/V state, and never touch the 512 expert blobs.
++
++With `STRATA_MTP_ROOM_MIN=TOKENS`, a request that **reads** at least TOKENS prompt tokens (0: every request) takes
++those bytes for as long as it is read: the prompt path's ring is **pointed at the block itself**, and the decode's own
++bytes are copied back into it before the first generated token. The block never leaves VRAM and never moves. TOKENS
++counts the tokens this request reads, not the whole prompt: an agent turn that sends a 50,000-token conversation and
++reuses 49,900 of it reads 100 tokens, and the room has nothing to buy there.
++
++Unset (the default), nothing of this runs and the prompt path is laid out exactly as it was.
++
++## Why
++
++A prompt streams the experts a chunk does not hold in VRAM through the ring of staging slots, a copy of each blob is
++issued `ring` slots ahead of its use, and the ring's size is the measure of how far ahead that is. The ring competes
++with the expert cache for the same VRAM, and on a card where the cache took everything the reserve left, the ring is
++what a decode-only 708 MB can buy.
++
++The Maya checkout implemented the same room first for its DFlash drafter (local commit `7df369c`) and then for its MTP
++config's NextN block (local commit `5ccf9a4`, whose expert slots leave the decode's pool while a prompt runs). Its
++`7df369c` records the room as not yet measured and names the standing baseline on its byte-identical 100,535-token
++read: 89.5 s (1,123 tok/s). Expect a gain where the ring is the limit and nothing where it is not.
++
++**Measured on our Q8_0 4-way rig** (what it was measured on and every number is under
++[Measuring it](#measuring-it)): the room did what this page says - it opened, the 675 MiB really went into the ring,
++and the decode ran unchanged - and it bought no time at the prompt sizes tried, because the ring was not the limit
++there. The numbers below are from its first shape, which laid the prompt path out again around the block and so cost
++3.4 to 4.0 s per roomed request; the shape described here lends the block **in place** and has no rebuild at all.
++
++**Reported on an 8 GB RTX 2060 SUPER by merbanan** (on the pull request, ported onto a 0.1.45-based branch; not run by
++us): there the ring *was* the limit, and the room was worth **+17% prompt tokens/s at 4K, +17% at 16K and +23% at
++32K**, with decode unchanged and the first-token logits bitwise equal to the unset run. The report is under
++[Measuring it](#measuring-it).
++
++## What it does
++
++1. **At start**, `STRATA_MTP_ROOM_MIN` is read once. The room is `experts_bytes / max_blob` ring slots (135 on a Q8_0
++   pack, whose largest blob is 4.98 MiB, for 512 experts of 1,382,400 bytes each). The engine prints the read-token
++   threshold, the MiB, the slots and the card.
++2. **The prompt path on the drafter's card is given those bytes** (`Prefill::set_ring_room_base`): slot `i` of the room
++   is `experts + (i - rule) * max_blob`, so a slot IS a part of the drafter's block. Nothing is allocated, nothing
++   spills and the room costs **no VRAM of its own** - the layout holds it for the engine's life, and the loan, the
++   cache and `relayout` are untouched by it.
++3. **Per request**, if the request reads at least TOKENS tokens (the prompt minus the prefix a cached conversation
++   reuses):
++   1. The drafter's stream is synchronized, its streamed chain waited for, and the 512 blobs are copied into a pinned
++      host buffer (taken once and kept: the room opens and closes around every long prompt, and a second read of the
++      675 MiB `experts.bin` per prompt is what that avoids).
++   2. The room is switched on: the path's ring count goes from the rule's slots to the rule's + the room's
++      (`set_ring_room_active`). **Nothing is laid out again** - the slots' own pointers do not move - so there is no
++      rebuild, no `relayout` refusal and no loan to re-anchor.
++   3. The prompt is read, staging its expert blobs over the drafter's bytes. The draft layer's K/V pass (`draft_kv`)
++      runs as usual: it reads the dense tensors and the K/V state, not the experts.
++   4. Before the first window: the path's streams are synchronized, the ring count goes back to the rule's, and the
++      675 MiB are copied from the pinned buffer **back into the same block, at the same address**
++      (`MtpDrafter::experts_reclaim`). The decode's captured round and step graphs carry that address, so nothing is
++      dropped and no round pays a re-capture.
++4. **Guards.** While the experts are lent, `draft`, `draft_first`, `chain_launch` and `record_rest` refuse with an
++   error rather than read the prompt's staged bytes as experts. In `--serve` no decode runs between 3.1 and 3.4
++   anyway: the room is opened and closed inside one request's prompt.
++
++The block's bytes reach the prompt path **only as ring slots**, because the ring is what `carve` lays out last: every
++other buffer of a chunk is inside the region `bytes_needed` sized for it. A room therefore cannot enlarge a chunk
++(that is `--prefill-chunk`'s or the auto scan's job, and it is decided at start, before any prompt runs).
++
++## Costs
++
++- 708 MB of pinned host memory (taken once, at the first roomed prompt; on a host with 40 GiB already page-locked,
++  merbanan reported the first `cudaHostAlloc` taking 24.4 s, which a later request does not pay again).
++- 708 MB over the PCIe link each way per roomed request, and nothing else: no layout, no allocation, no graph.
++- No VRAM of its own: the room is the drafter's bytes, which are already resident.
++- Requests that read less than the threshold (an agent turn reusing most of its conversation), every decode, and every
++  other part of the engine are untouched.
++
++## Limits
++
++- `--serve` only, `--mtp` needed, `--batch` not supported (its slot drafters share the solo drafter's weights, so the
++  room would point one drafter's ring at another's experts). The engine refuses each with the reason.
++- A layer split is fine: the room goes to the prompt path on the drafter's card (`--mtp-first`: the first).
++- `--pipeline-windows` is fine: the room closes before the request's first window.
++- `--prefill-head-alias` is fine: the head's rebuild lays the path out with the room already in it, and the two are put
++  back independently (the room before the first window, the head with its own `head_restore`).
++- Measured on the Q8_0 4-way rig, at 3,080 and 14,859 tokens, and on the shape that still rebuilt the prompt path;
++  there the ring was not the limit, so the room bought nothing and its rebuild was what the request paid. Reported by
++  merbanan on an 8 GB RTX 2060 SUPER, where the ring was the limit: +17% / +17% / +23% at 4K / 16K / 32K. The
++  in-place shape and the threshold that counts the tokens a request reads were measured on the same Q8_0 4-way rig
++  on 2026-10-19: a continuation that reads 7 tokens skips the room, and its first token came 0.19-0.21 s sooner
++  (that is the room's lend and reclaim). See [Measuring it](#measuring-it).
++
++## Measuring it
++
++The env var is the A/B switch, so two fresh engines with the same prompt do it (the style
++[docs/COMMUNITY_BENCHMARKS.md](COMMUNITY_BENCHMARKS.md) asks for):
++
++```sh
++STRATA_MTP_ROOM_MIN=0  <engine and args>    # every request takes the room
++<engine and args>                           # standing behaviour (the variable unset)
++```
++
++What to read:
++
++- The startup line `STRATA_MTP_ROOM_MIN=...: a request that reads ... prompt tokens or more points the prompt path's
++  ring on CUDA... at the drafter's ... MiB of experts (N slots past its own)` — N is what the ring gained.
++- `strata serve: prompt room: ... tokens to read, the prompt path's ring is the drafter's ... MiB (N slots past its
++  own, lent in X ms)` — X is the snapshot's DMA, the whole cost of opening the room now that nothing is laid out again.
++  The count is the request's, not the whole prompt: compare it with the `RESUME` line.
++- `strata serve: prompt room (prompt done): the drafter's experts are the decode's again in X ms` — the second DMA.
++- The prompt's own time (the `prompt done` line and the `prefill` tokens/s the API reports; the engine's `prompt ...
++  read in` line covers the room's close too) and, for the same requests, decode tokens/s (which should not move) and
++  the free VRAM while decoding.
++- `strata mtp draft timing`, and that **no** `round/step graphs are dropped` line appears: the block cannot move.
++
++An agent turn that reuses most of its prompt (say 50,000 tokens sent, 49,900 reused, 100 read) skips the room at
++`STRATA_MTP_ROOM_MIN=1024`, which is what counting the tokens read is for. A request that reads a few thousand new
++tokens on a card whose cache holds most experts should show the two DMAs and no gain; a long cold read on a card that
++streams nearly every expert is where the ring has been worth its bytes.
++
++### Measured: Q8_0 4-way, 2026-10-16
++
++**What it was measured on.** 2× RTX 3060 (11.6 GB) + 2× RTX 5060 (7.5 GB), layer split `auto` across all four cards,
++Qwen3.8-Flash-Next Q8_0 pack, MTP runtime `rt`, `--spec 4`, `--kv-resident 65536`, `--max-context 262144`. The engine
++was this branch's build, `--serve` only. The prompt chunk auto-picked 3,328 tokens with a 101-slot ring; the room's
++135 slots take it to 236 while a roomed prompt runs. Each arm was a fresh engine, the variable unset against `=0`, one
++request per size, `temperature 0`, 96/128 tokens out.
++
++**These numbers are the port's FIRST shape**, which laid every prompt path out again around the block and allocated its
++bytes as a spill block of its own (2.3-2.5 s) before reading and again after (1.6 s). The shape this page now
++describes lends the block in place, so those two rebuilds do not happen; the ring, the prompt and the decode are the
++same either way, and the conclusion below is about the rig and the prompt sizes, not about the mechanism.
++
++| prompt | arm | read (the engine's `prompt … read in` line) | of which the room | decode |
++|---|---|---|---|---|
++| 3,080 tokens | room | 20,647 ms (149.2 tok/s) | rebuild 2,461.6 ms + back 1,572.5 ms | 25.1 tok/s |
++| 3,080 tokens | room (repeat) | 20,685 ms (148.9 tok/s) | rebuild 2,308.7 ms + back 1,580.9 ms | 25.9 tok/s |
++| 3,080 tokens | standing | 16,171 ms (190.5 tok/s) | — | 26.4 tok/s |
++| 14,859 tokens | room | 39,807 ms (373.3 tok/s) | rebuild 1,852.6 ms + back 1,566.1 ms | 31.2 tok/s |
++| 14,859 tokens | standing | 35,794 ms (415.1 tok/s) | — | 32.7 tok/s |
++
++The engine's `prompt … read in` line covers the room open and close (it is timed from the start of the request to
++`room_close`), so what the read itself took is that minus the two room lines: about 16.6 s against 16.2 s at 3,080
++tokens, and 36.4 s against 35.8 s at 14,859. **The ring bought nothing at either size** - it was not what the prompt
++was waiting on - and the room's own 3.4-4.0 s was what the request paid in that shape.
++
++Everything else behaved as designed. The start-up line read `a prompt of 0 tokens or more lends the drafter's 675 MiB
++of experts on CUDA3 to the prompt path's ring (135 slots past its own), and they are back before the first window`.
++CUDA3's free VRAM while a roomed prompt ran was 66 MiB, the same as standing (66 MiB): the freed 675 MiB was the ring.
++On the **first** roomed prompt of an engine the block came back at another address (`came back at 0x744866000000, not
++0x746dbc000000`) and the round/step graphs were dropped and captured again - the decode after it ran at 25.9 tok/s all
++the same; every later prompt returned it to the same address and nothing was dropped. No guard refused a `draft`, no
++request errored, and decode was unchanged within noise (the two arms' expert-cache hit rate was within 1.3 points of
++each other). In the shape this page describes, that graph drop cannot happen: the block never moves.
++
++This is the shape the Maya checkout implemented too: the room moves the ring, and on a machine where the ring is not
++the limit, that is all it moves.
++
++### Measured: RTX 2060 SUPER 8 GB, reported 2026-10-18
++
++**What it was measured on.** Reported by **merbanan** on the pull request, on a port of this PR onto a 0.1.45-based
++branch; the maintainers have not run this shape on this card. RTX 2060 SUPER 8 GB (sm_75), PCIe 3.0 x8, Ryzen 9
++3900X, 92 GB RAM, Qwen3.8-Flash-Next IQ3_XXS, `--serve --mtp` (Q2_0 drafter, 675 MiB of experts),
++`--resident-budget-gib 40` (fully page-locked), `--kv k8v4 --kv-resident 20480`, `--prefill auto`. The auto scan's
++chunk was 6,656 tokens with a **96-slot ring**; the room adds **303 slots** (399 in all) and the chunk stays 6,656.
++
++The ring was the limit on this card. `STRATA_PREFILL_RING` alone, paired A/B with 3 pairs against the 96-slot default
++(prompt tok/s): 48 slots gave -6.3% / -3.4% / -4.6% at 4K / 16K / 32K; 192 slots gave +9.8% / +6.2% / +2.3% at the same
++sizes, with decode -3.1 to -3.6 tok/s. Taking ring slots from the expert cache also shrinks the auto chunk
++(6,656 -> 5,632) and costs decode after short prompts; the room gets the ring without either cost.
++
++`STRATA_MTP_ROOM_MIN=0` against the same build unset (paired A/B, 3 pairs, prompt tok/s / decode tok/s):
++
++| prompt | unset | room | paired difference (prompt) | decode |
++|---|---|---|---|---|
++| 4K | 448.4 | 527.2 | +75.8 (+17%) | -0.27 (noise) |
++| 16K | 558.9 | 658.1 | +94.4 (+17%) | +1.42 (noise) |
++| 32K | 584.0 | 719.7 | +135.7 (+23%) | -0.17 (noise) |
++
++The lend cost 107 ms per roomed request. The first roomed request after a start paid 24.4 s once, for the 708 MB
++`cudaHostAlloc` with 40 GiB already page-locked; later requests did not pay it. The first-token logits after a
++15,521-token prompt were **bitwise equal** to the unset run (two runs per arm, all four identical), the 48-token
++greedy replies matched, and the drafter's acceptance after the room was given back was normal (27 of 34), so
++`experts_reclaim` restores the bytes intact. `STRATA_PREFILL_KEEP=64` (#2833) on top of the room changed nothing on
++this card: the chunk stayed 6,656 and the result was +78.2 / +92.0 / +134.9.
++
++What this report does not cover: HIP/SYCL, `--prefill-head-alias`, or a threshold other than `0`. The in-place shape
++and the threshold that counts the tokens a request reads were measured on our Q8_0 4-way rig after it (below); `=0`
++keeps every request roomed, as measured here and in the control there.
++
++### Measured: Q8_0 4-way, 2026-10-19: the threshold that counts what a request reads
++
++**What it was measured on.** 2x RTX 3060 (11.6 GB) + 2x RTX 5060 (7.5 GB), layer split `18,39,46`,
++Qwen3.8-Flash-Next Q8_0 pack, MTP runtime `rt`, `--spec 4 --spec-min-p 0.5`, `--prefill auto:262144`,
++`--kv fp16 --kv-resident 0`, `--max-context 262144 --vram-reserve-mib 700 --trim-stage-weights --vision`, 247 GB of
++RAM. The config's other environment variables (`STRATA_PREFILL_MAX`, `STRATA_WARM_PROMPT`, `STRATA_MMQ_SLAB`,
++`STRATA_PREFILL_STAGES`, `STRATA_PREFILL_KEEP`) belong to branches that are not in this one and were ignored; only
++`STRATA_MTP_ROOM_MIN` is read here. The room was the drafter's 675 MiB on CUDA3 (135 slots past the ring's own).
++
++Two engines from the same branch, one start each: the parent commit (whole-prompt test) against the fixed one
++(tokens-read test), `MIN=1024` in both. The same client sent one 5,042-token chat (temperature 0, 32 tokens out,
++roomed in both arms) and then three continuations: the assistant's answer echoed back plus a one-line user turn,
++3 tokens out. A third start of the fixed binary at `MIN=0` is the control.
++
++| request | parent: whole prompt | fixed: tokens read |
++|---|---|---|
++| cold: 5,042 read | room 5042 tok; lend 603 + close 104 ms; read 17,454 ms; first token 17.62 s | room 5042 tok; lend 534 + close 107 ms; read 17,323 ms; first token 17.47 s |
++| turn 2: 5,035 reused + **61 read** | room **5096 tok**; 102 + 104 ms; read 2,054 ms; first token 2.110 s | **no room**; read 1,813 ms; first token **1.869 s** |
++| turn 3: 5,089 reused + **7 read** | room **5096 tok**; 102 + 104 ms; read 360 ms; first token 0.409 s | **no room**; read 153 ms; first token **0.203 s** |
++| turn 4: 5,089 reused + **7 read** | room **5096 tok**; 102 + 105 ms; read 344 ms; first token 0.390 s | **no room**; read 152 ms; first token **0.199 s** |
++
++The parent lent the room for the whole 5,096-token prompt on every continuation while the request read 61, 7 and 7
++tokens; its lend and reclaim (the two numbers in each cell) are the whole difference. Turns 3 and 4 are the clean
++comparison - turn 2 also restores the 5,035-token conversation, so its read is not the room's cost alone: the room's
++~206-207 ms is gone, and the first token comes 206 ms and 191 ms sooner. The cold request still takes the room in
++both arms; its 131 ms difference is run-to-run noise (the control start read the same prompt in 16,286 ms).
++
++The `MIN=0` control opened the room on the same continuations with `23 tokens to read` and `7 tokens to read`
++(lend ~103 ms, close 105-106 ms): first token 0.432 s and 0.415 s on turns 3-4, the parent's ~0.4 s again. So `=0`
++is unchanged, and the savings above are the room being skipped, not the new binary.
++
++Every continuation answered `done.` in all three arms. The cold answer (temperature 0) matched between the parent
++and fixed arms but differed in the control run after the same opening, so run-to-run bitwise determinism is not
++claimed here. What this measurement does not cover: more than one run per timing, HIP/SYCL, `--prefill-head-alias`,
++or a threshold other than 0/1024.
++
++## Where this comes from
++
++From the Maya checkout (`project-maya`): local commit `7df369c` (`STRATA_GLM_ROOM_MIN`) does this for its DFlash
++drafter's weights and its prestage ring, and `5ccf9a4` does it for the MTP config's NextN block, whose expert slots
++leave the decode's pool while a prompt runs; `d4d0792` rounds the tail's slots up so the reload lives on the bytes the
++shrink hands back. What this port keeps is the mechanism: a decode-only block becomes the prompt path's ring for the
++length of a prompt, and what it costs is the block's own contents. What differs is Strata's own machinery - here the
++room's slots are *carved from the drafter's own block* rather than from freed cache, because Strata's drafter owns its
++512 experts as one contiguous allocation and never shares them with the expert cache; lending them in place is the
++Maya checkout's later shape (`5ccf9a4`), and it is what removes the rebuild this port started with.
+diff --git a/include/strata/core/mtp.hpp b/include/strata/core/mtp.hpp
+index 7216f015af..4017080f09 100644
+--- a/include/strata/core/mtp.hpp
++++ b/include/strata/core/mtp.hpp
+@@ -71,6 +71,25 @@ class MtpDrafter {
+     int32_t top2(int j) const { return j >= 0 && j < (int) top2_.size() ? top2_[(size_t) j] : -1; }
+     int max_t() const { return max_t_; }
+     uint64_t vram_bytes() const { return vram_; }
++
++    /// THE PROMPT ROOM (STRATA_MTP_ROOM_MIN).  The layer's 512 routed experts (708 MB) are read by the DECODE alone:
++    /// `record_rest` is their only reader, and every prompt pass - the capture's K/V (record_front) and the prompt
++    /// path's Prefill::draft_kv - touches the dense tensors and the K/V state instead.  So a long prompt may take
++    /// their bytes: the prompt path's ring is pointed AT this block (Prefill::set_ring_room_base), and every expert
++    /// blob it stages overwrites an expert.  `experts_lend` copies the block into pinned host memory first (taken
++    /// once, so the `experts_reclaim` after the prompt is a DMA and not another read of experts.bin); `reclaim`
++    /// copies it back IN PLACE.
++    /// THE BLOCK IS NEVER FREED, NEVER REALLOCATED AND NEVER MOVES: the round and step graphs were captured with its
++    /// address as the MoE kernel's argument, and lending it in place is what keeps them valid - nothing is dropped
++    /// and no round pays a re-capture.
++    /// While the experts are lent no decode pass may run: `draft`, `draft_first`, `chain_launch` and `record_rest`
++    /// refuse (with `err`), rather than read the prompt's staged bytes as experts.
++    uint64_t experts_bytes() const;    ///< 0: this drafter does not own the experts (shared weights: --batch-mtp)
++    void* experts_base() const { return experts_; }   ///< the bytes the room's slots are carved from
++    bool experts_resident() const { return experts_ != nullptr && !experts_lent_; }
++    bool experts_lend(std::string& err);      ///< snapshot to pinned host (the block stays in place)
++    bool experts_reclaim(std::string& err);   ///< the snapshot back into the block, at the address it never left
++
+     /// The draft layer's K/V state (read-only: --serve's STRATA_STATE_HASH check hashes it)
+     const QsaState& kv_state() const { return st_; }
+     /// KV streaming: refill the ring of the drafter's window from its host copy for a sequence that continues at
+@@ -169,6 +188,13 @@ class MtpDrafter {
+ 
+ private:
+     bool record_forward(int T, int step_row0, cudaStream_t cs, std::string& err);
++    /// False (with `err`) while the experts are lent to a prompt: the prompt path's ring is pointed at their bytes
++    /// (STRATA_MTP_ROOM_MIN), so a decode pass would read the prompt's staged blobs as experts.  Every decode entry
++    /// checks this before it launches anything.
++    bool decode_ready(std::string& err) const {
++        if (experts_lent_) { err = "mtp: the 512 experts are lent to a prompt (STRATA_MTP_ROOM_MIN)"; return false; }
++        return true;
++    }
+     /// The layer's front for T rows at step rows [row0, +T): the embedding, the fc projections, the attention
+     /// hyper-connection read (R_, inj_, mixed_) and the K/V appended.
+     bool record_front(int T, int row0, cudaStream_t cs, std::string& err);
+@@ -246,6 +272,11 @@ class MtpDrafter {
+     std::vector<Tensor> tensors_;
+     uint8_t* dense_ = nullptr;
+     uint8_t* experts_ = nullptr;
++    // the prompt room: the experts' pinned host snapshot, its size, and whether a prompt has taken their contents
++    // (the block itself stays where it is - see experts_lend)
++    void* experts_host_ = nullptr;
++    uint64_t experts_host_bytes_ = 0;
++    bool experts_lent_ = false;
+     // Slot drafters borrow immutable weights and head; each still owns its state and scratch.
+     bool owns_weights_ = true;
+     bool owns_draft_head_ = true;
+diff --git a/include/strata/prefill/prefill.hpp b/include/strata/prefill/prefill.hpp
+index 6c42608248..6cf03fa89f 100644
+--- a/include/strata/prefill/prefill.hpp
++++ b/include/strata/prefill/prefill.hpp
+@@ -124,6 +124,33 @@ class Prefill {
+     /// fits it keeps 0.1.39's ring).  0 slots = none.  A layer split's set_ring_override and STRATA_PREFILL_RING win.
+     static void set_ring_budget(int slots, int64_t small_max);
+ 
++    /// THE PROMPT ROOM (STRATA_MTP_ROOM_MIN): `slots` ring slots ON TOP of the rule above, POINTED AT another device
++    /// user's bytes - the MTP drafter's 512 routed experts, which only the decode reads (MtpDrafter::experts_lend).
++    /// A slot at or past the rule's ring is `base + (i - rule) * max_blob`: nothing is allocated for it, nothing is
++    /// owned and nothing spills, so the room costs no VRAM of its own and `relayout` keeps working.  The layout holds
++    /// them for the instance's life; ONE PROMPT takes them by `set_ring_room_active(true)`, which moves the ring's
++    /// count (the rule's <-> the rule's + the room's) and nothing else.
++    /// Never past ring_cap() (the ring's events are sized for that), never past what `set_ring_room_base` says the
++    /// lender has, and only where the ring is a big one (a chunk at or above stream_all_min(): below it the ring is
++    /// STAGE slots of a different mechanism).  Set before `init`/`relayout`; 0 (the default): the rule's ring exactly,
++    /// as before.
++    void set_ring_room(int slots) { ring_room_ = slots > 0 ? slots : 0; }
++    int ring_room() const { return ring_room_; }
++
++    /// The memory the room's slots are carved from: `bytes` of another device user's, given to this path's ring for
++    /// the length of one prompt (the drafter's expert block).  Null (the default): no room, whatever `slots` says.
++    void set_ring_room_base(void* base, uint64_t bytes) { ring_room_base_ = base; ring_room_bytes_ = bytes; }
++
++    /// While true the room is THIS prompt's: `ring()` (the streamed ring's slot count) counts it too, and an
++    /// `init`/`relayout` after this re-carves with it.  False (the default): the rule's ring, so a slot of the room
++    /// is never staged into and the lender's bytes are left alone.
++    void set_ring_room_active(bool on);
++    bool ring_room_active() const { return ring_room_active_; }
++
++    /// True when every stream of this path has finished.  The room's close needs it: what a prompt staged into those
++    /// slots is written over by the lender's own bytes, and a prompt pass still reading them would take the DMA.
++    bool idle(std::string& err);
++
+     /// Device bytes `init` needs for a chunk of `chunk` tokens (what a borrowed region must hold).  `src`: init gets an
+     /// ExpertSource (carve picks the fused MoE layout only then).
+     static uint64_t bytes_needed(const core::ModelGeometry& g, const core::SessionState& ss, int64_t chunk,
+@@ -241,6 +268,10 @@ class Prefill {
+     static uint64_t bytes_needed_impl(const core::ModelGeometry& g, const core::SessionState& ss, int64_t chunk,
+                                       bool owned_pages, bool src);
+     kernels::cpu::ExpertPool* cpu_pool_ = nullptr;   ///< set_cpu_pool
++    int ring_room_ = 0;                              ///< set_ring_room (this instance's, and it survives `reset`)
++    void* ring_room_base_ = nullptr;                 ///< set_ring_room_base: the bytes the room's slots are
++    uint64_t ring_room_bytes_ = 0;
++    bool ring_room_active_ = false;                  ///< the room is this prompt's (survives `reset` with it)
+     // Stage-1 pipeline: intermediate stages return after handing their chunk to
+     // the direct successor. The public run() drains the chain once at prompt end.
+     bool run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::string& err);
+diff --git a/src/core/mtp.cpp b/src/core/mtp.cpp
+index 68be442069..892bd3ef45 100644
+--- a/src/core/mtp.cpp
++++ b/src/core/mtp.cpp
+@@ -155,6 +155,7 @@ MtpDrafter::~MtpDrafter() {
+     if (sh_join_) cudaEventDestroy(sh_join_);
+     if (owns_weights_ && dense_) cudaFree(dense_);
+     if (owns_weights_ && experts_) cudaFree(experts_);
++    if (experts_host_) cudaFreeHost(experts_host_);   // the prompt room's host snapshot (the device copy never left)
+     if (state_arena_) cudaFree(state_arena_);
+     if (arena_) cudaFree(arena_);
+     if (head_logits_) cudaFree(head_logits_);
+@@ -537,6 +538,54 @@ void MtpDrafter::record_top2(int j) {
+     top2_[(size_t) j] = b2 < 0 ? -1 : dhead_ != nullptr ? dvocab_host_[(size_t) b2] : (int32_t) b2;
+ }
+ 
++// ---- the prompt room (see the header): the 512 experts leave the device while a prompt is read, and come back
++uint64_t MtpDrafter::experts_bytes() const {
++    if (!owns_weights_ || g_ == nullptr || experts_ == nullptr) return 0;   // a shared drafter's experts are the owner's
++    return (uint64_t) g_->n_expert * strata::kernels::cpu::BLOB;
++}
++
++bool MtpDrafter::experts_lend(std::string& err) {
++    const uint64_t bytes = experts_bytes();
++    if (bytes == 0) { err = "mtp: the 512 experts are not this drafter's to lend"; return false; }
++    if (experts_lent_) return true;
++    const OnDevice on_device(device_);
++    if (!idle(err)) return false;
++    if (chain_live_) { err = "mtp: a chain is in flight"; return false; }
++    if (experts_host_ == nullptr) {
++        // taken once and kept: the room opens and closes around every long prompt, and a second read of experts.bin
++        // (675 MiB) per prompt is what this avoids
++        if (cudaMallocHost(&experts_host_, (size_t) bytes) != cudaSuccess) {
++            (void) cudaGetLastError();
++            err = "mtp: the 512 experts have no room in pinned host memory (they stay the decode's)";
++            return false;
++        }
++        experts_host_bytes_ = bytes;
++    }
++    // The block stays in VRAM, where it is: the prompt path's room slots ARE these bytes (set_ring_room_base), so
++    // this snapshot is what they are worth again once the prompt has read over them.
++    if (cudaMemcpy(experts_host_, experts_, (size_t) bytes, cudaMemcpyDeviceToHost) != cudaSuccess) {
++        (void) cudaGetLastError();
++        err = "mtp: copying the 512 experts to host memory failed (they stay the decode's)";
++        return false;
++    }
++    experts_lent_ = true;
++    return true;
++}
++
++bool MtpDrafter::experts_reclaim(std::string& err) {
++    if (!experts_lent_) return true;
++    const OnDevice on_device(device_);
++    if (!idle(err)) return false;
++    // IN PLACE: the address is the one the round and step graphs were captured with, so there is nothing to drop
++    if (cudaMemcpy(experts_, experts_host_, (size_t) experts_host_bytes_, cudaMemcpyHostToDevice) != cudaSuccess) {
++        (void) cudaGetLastError();
++        err = "mtp: copying the 512 experts back failed";
++        return false;
++    }
++    experts_lent_ = false;
++    return true;
++}
++
+ uint64_t MtpDrafter::bind_bytes(uint64_t head_row_bytes, int64_t n_vocab) const {
+     uint64_t bytes = head_logits_ ? 0 : (uint64_t) max_t_ * (uint64_t) n_vocab * sizeof(float);
+     if (dhead_ == nullptr && owns_draft_head_ && !full_head_env()) {
+@@ -995,6 +1044,7 @@ void MtpDrafter::norm_rope(float* data, const float* gamma, int rows, int cols,
+ 
+ bool MtpDrafter::record_rest(int step_row, cudaStream_t cs, std::string& err) {
+     using namespace strata::kernels;
++    if (!decode_ready(err)) return false;   // this is the 512 experts' only reader
+     const ModelGeometry& g = *g_;
+     SessionState& ss = *ss_;
+     const int T = 1;
+@@ -1552,6 +1602,7 @@ DraftTiming g_dt;
+ 
+ bool MtpDrafter::draft(int T, const int32_t* tokens, int64_t p, int a, int32_t* drafts, std::string& err,
+                        float* probs, float min_p, int* n_drafts) {
++    if (!decode_ready(err)) return false;   // the steps read the 512 experts (record_rest)
+ #if defined(STRATA_GPU_METAL)
+     {
+         if (T < 1 || T > max_t_ || a < 0 || a >= T) { err = "mtp: draft arguments out of range"; return false; }
+@@ -1770,6 +1821,7 @@ bool MtpDrafter::prepare_chain(std::string& err) {
+ bool MtpDrafter::chain_launch(int T, const int32_t* tokens, int64_t p, int a, const int32_t* force, int n_force,
+                               int n_out, int n_early, std::string& err) {
+     const OnDevice on_device(device_);
++    if (!decode_ready(err)) return false;   // the chain's step graphs read the 512 experts
+     if (chain_live_) { err = "mtp: a chain is already in flight"; return false; }
+     if (!force_on_ || ev_chain_ == nullptr) { err = "mtp: chains need prepare_chain"; return false; }
+     if (T < 1 || T > max_t_ || a < 0 || a >= T || n_out < 1 || n_out > max_t_ - 1 || n_force < 0 || n_force > n_out ||
+@@ -1851,6 +1903,7 @@ int MtpDrafter::chain_poll(std::string& err) {
+ 
+ bool MtpDrafter::draft_first(int T, const float* R_row, int32_t token, int64_t cell, int32_t* drafts, std::string& err,
+                              float* probs, float min_p, int* n_drafts) {
++    if (!decode_ready(err)) return false;   // the first round's steps read the 512 experts
+ #if defined(STRATA_GPU_METAL)
+     {   // the decode window's row 0 is the residual (the window that just ran)
+         (void) R_row;
+diff --git a/src/prefill/prefill.cpp b/src/prefill/prefill.cpp
+index 17428925ee..d622e665cb 100644
+--- a/src/prefill/prefill.cpp
++++ b/src/prefill/prefill.cpp
+@@ -949,6 +949,10 @@ struct Prefill::Impl {
+     uint16_t* dq_d[DQ] = {};
+     uint8_t* stage_dev[RING_MAX] = {};
+     int ring = STAGE;                        // the slots of this layout's ring (ring_slots)
++    // THE PROMPT ROOM's resolved counts for this layout (carve): the rule's ring, the room's first slot (past the
++    // staging buffers this layout holds), and the lender's slots on top of them.  `ring` is `room_at` + `room` while
++    // a roomed prompt runs and `rule` alone otherwise (set_ring_room_active).
++    int ring_rule = 0, ring_room = 0, ring_room_at = 0;
+     // this layout's GU, H and Xq are the fused path's (moe_bufs' `fused`), so a layer that runs MMQ or the FP16 path may
+     // only write stream_all_min() - 1 of its rows into them; fused_layout() keeps the two in step (#583, #954)
+     bool fused_bufs = false;
+@@ -1485,7 +1489,25 @@ bool Prefill::carve(size_t T, void* alloc) {
+     }
+     m.ring = ring_slots(T);
+     const int nstage = stage_slots(T);   // the staged walk may use STAGE_GRP of them
+-    if (o.base == nullptr && m.ring > 0) {
++    m.ring_rule = m.ring;    // the rule's ring: inside the region, because the loan was sized for it
++    m.ring_room = 0;         // THE PROMPT ROOM's slots on top of it (set_ring_room), the lender's own bytes
++    m.ring_room_at = nstage; // the room starts past the layout's staging buffers (stage_slots(T) of them)
++    // THE PROMPT ROOM (set_ring_room + set_ring_room_base): another device user's bytes - the MTP drafter's 512
++    // routed experts, which only the decode reads - pointed at as so many more ring slots for one prompt.  The slots
++    // ARE those bytes: nothing is allocated, nothing is owned, nothing spills, and the last layout of this path
++    // keeps them, so a prompt takes them by moving `m.ring` alone (set_ring_room_active) and the lender's own bytes
++    // are never left out of VRAM.  Never past ring_cap() (`copied`/`used` exist for i < ring_cap(), and the arrays
++    // are RING_MAX) and never past what the lender said it has (one slot is one max_blob).
++    if (ring_room_ > 0 && m.ring > STAGE && ring_room_base_ != nullptr) {
++        const int64_t cap = std::min<int64_t>((int64_t) ring_cap() - m.ring_room_at,
++                                              (int64_t) (ring_room_bytes_ / (uint64_t) MAXBLOB()));
++        const int64_t room = std::min<int64_t>((int64_t) ring_room_, cap);
++        if (room > 0) {
++            m.ring_room = (int) room;
++            if (ring_room_active_) m.ring = m.ring_room_at + (int) room;   // the room is this prompt's: the ring counts it
++        }
++    }
++    if (o.base == nullptr && nstage > 0) {
+         // OWNED buffers: the ring in ONE allocation.  384 separate 2.7 MiB cudaMallocs each round up to a 2 MiB page
+         // (~1.3 MiB a slot, ~0.5 GiB in all) that no count ever saw.  A borrowed region keeps its per-slot layout (and
+         // so its price, `bytes_needed`: the loans' slot counts do not move).
+@@ -1502,6 +1524,13 @@ bool Prefill::carve(size_t T, void* alloc) {
+             m.used_of[i] = i;
+         }
+     }
++    if (m.ring_room > 0) {   // THE PROMPT ROOM's slots: the lender's bytes, at the lender's address, taken from nobody
++        for (int i = m.ring_room_at; i < m.ring_room_at + m.ring_room; ++i) {
++            m.stage_dev[i] = (uint8_t*) ring_room_base_ + (size_t) (i - m.ring_room_at) * (size_t) MAXBLOB();
++            m.stage_live[i] = false;                        // the lender's bytes are live experts, not a staged blob
++            m.used_of[i] = i;
++        }
++    }
+     m.ple_emb = o.take<float>(T * N, ok);
+     m.ple_norm = o.take<float>((size_t) strata::kernels::NG_HC_DIM, ok);
+     take_stage(o, ss, s, m.stage, ok);
+@@ -1547,6 +1576,25 @@ bool Prefill::relayout(int64_t chunk, void* borrow, uint64_t borrow_bytes, std::
+ 
+ int64_t Prefill::chunk() const { return impl_->T; }
+ 
++void Prefill::set_ring_room_active(bool on) {
++    ring_room_active_ = on;
++    Impl& m = *impl_;
++    // the slots' own pointers do not move: the room is taken and given back by the ring's count alone
++    if (m.ring_room > 0) m.ring = on ? m.ring_room_at + m.ring_room : m.ring_rule;
++}
++
++bool Prefill::idle(std::string& err) {
++    Impl& m = *impl_;
++    if ((m.cs && cudaStreamSynchronize(m.cs) != cudaSuccess) ||
++        (m.copy && cudaStreamSynchronize(m.copy) != cudaSuccess) ||
++        (m.kv_copy && cudaStreamSynchronize(m.kv_copy) != cudaSuccess)) {
++        (void) cudaGetLastError();
++        err = "prefill: the prompt path's streams failed";
++        return false;
++    }
++    return true;
++}
++
+ bool Prefill::draft_kv(core::MtpDrafter& mtp, const float* R_rows, const int32_t* next_tokens, int64_t n, int64_t cell0,
+                        std::string& err, const char** why) {
+     Impl& m = *impl_;
+diff --git a/src/program/generate.cpp b/src/program/generate.cpp
+index aae5163169..1f08ccb014 100644
+--- a/src/program/generate.cpp
++++ b/src/program/generate.cpp
+@@ -8156,6 +8156,49 @@ int main(int argc, char** argv) {
+                                  "%lld MiB free\n",
+                          (long long) o.prefill_chunk, (long long) (borrow_bytes >> 20), (long long) (free_b >> 20));
+         }
++        // STRATA_MTP_ROOM_MIN=TOKENS (opt-in): a request that READS at least TOKENS prompt tokens (0: every request)
++        // points the prompt path's ring AT the MTP drafter's 512 routed experts - 708 MB that only the DECODE reads
++        // (record_rest; the prompt's own passes, record_front's K/V and the prompt path's Prefill::draft_kv, run the
++        // layer's dense tensors and its K/V) - for as long as the prompt is read.  The block is lent IN PLACE: it is
++        // never freed, never allocated again and never moves, so no prompt path is laid out again, the decode's
++        // captured graphs stay valid (nothing is dropped), and what comes back before the first window is the
++        // decode's own bytes (MtpDrafter::experts_reclaim).  TOKENS counts the tokens this request reads, not the
++        // whole prompt: a turn that reuses a cached conversation prefix and reads a few hundred tokens gains nothing
++        // from the room and does not take it.  Unset (the default): not one line below runs, and the prompt path is
++        // laid out exactly as before.
++        const int64_t mtp_room_min = [] {
++            const char* v = std::getenv("STRATA_MTP_ROOM_MIN");
++            if (v == nullptr || v[0] == '\0') return (int64_t) -1;
++            char* end = nullptr;
++            const long long n = std::strtoll(v, &end, 10);
++            if (end == v || *end != '\0' || n < 0) return (int64_t) -2;   // not a count: say so, not "0: every request"
++            return (int64_t) n;
++        }();
++        if (mtp_room_min == -2) {
++            std::fprintf(stderr, "strata generate: STRATA_MTP_ROOM_MIN=%s is not a token count (0: every request)\n",
++                         std::getenv("STRATA_MTP_ROOM_MIN"));
++            return 2;
++        }
++        int mtp_room_slots = 0;
++        if (mtp_room_min >= 0) {
++            const char* why = !o.serve ? "it needs --serve"
++                            : o.mtp.empty() ? "it needs --mtp"
++                            : o.batch > 0 ? "it does not support --batch: its slot drafters share the drafter's weights"
++                            : mtp.experts_bytes() == 0 ? "the drafter's 512 experts are not this drafter's to lend"
++                            : nullptr;
++            if (why != nullptr) {
++                std::fprintf(stderr, "strata generate: STRATA_MTP_ROOM_MIN is unavailable: %s\n", why);
++                return 2;
++            }
++            const int64_t blob = (int64_t) strata::kernels::cpu::expert_layout().max_blob;
++            mtp_room_slots = blob > 0 ? (int) std::min<int64_t>(mtp.experts_bytes() / blob, 4096) : 0;
++            std::fprintf(stderr, "strata serve: STRATA_MTP_ROOM_MIN=%lld: a request that reads %lld prompt tokens or "
++                                 "more points the prompt path's ring on CUDA%d at the drafter's %llu MiB of experts "
++                                 "(%d slots past its own) for as long as it is read, and the decode's own bytes are back "
++                                 "before the first window\n",
++                         (long long) mtp_room_min, (long long) mtp_room_min, mtp.device(),
++                         (unsigned long long) (mtp.experts_bytes() >> 20), mtp_room_slots);
++        }
+         bool any_loan = borrow != nullptr;
+         for (size_t i = 1; i < pf_parts.size(); ++i) any_loan = any_loan || pf_parts[i].first >= 0;
+         if (any_loan) {
+@@ -8195,7 +8238,13 @@ int main(int argc, char** argv) {
+         // the prompt path's own buffers (no loan) are not priced into them: with the whole arena pinned (#253) a
+         // `--prefill auto` split could stop at start with "device buffers for a chunk of 2048 tokens do not fit".  A
+         // chunk that does not fit is tried again one size smaller, down to 512 tokens (a smaller chunk only reads slower).
++        // The path the room belongs to (set below): the one on the drafter's card, which is where the ring's slots
++        // point into the drafter's expert block.  The room's LAYOUT is a start-up property - it costs nothing to
++        // hold (no allocation, no VRAM: the slots ARE the drafter's bytes) - and a prompt takes it by moving that
++        // path's ring count (set_ring_room_active), so any later rebuild here re-carves it the same way.
++        strata::prefill::Prefill* room_path = nullptr;
+         auto init_prompt_paths = [&]() -> int {   // 0: ready; 1: failed (err set); 2: failed with "do not fit"
++            room_path = nullptr;
+             for (size_t i = 0; i < stages.size(); ++i) {
+                 GpuStage& st = *stages[i];
+                 st.sp.set_stage(st.lb, i + 1 < stages.size() ? st.le : -1, i + 1 < stages.size() ? &stages[i + 1]->sp : nullptr);
+@@ -8207,18 +8256,32 @@ int main(int argc, char** argv) {
+                     sb = st.cache.device_slot(pf_parts[i + 1].first);
+                     sbb = part_bytes(pf_parts[i + 1], pf_parts[i + 1].first);
+                 }
++                // STRATA_MTP_ROOM_MIN: the drafter's card is the one whose prompt path is laid out with the room
++                const bool room_here = mtp_room_slots > 0 && mtp.device() == st.dev;
++                if (room_here) room_path = &st.sp;
++                st.sp.set_ring_room(room_here ? mtp_room_slots : 0);
++                st.sp.set_ring_room_base(room_here ? mtp.experts_base() : nullptr, room_here ? mtp.experts_bytes() : 0);
+                 if (share_pool) st.sp.set_cpu_pool(&pool);   // one stage at a time takes it for a chunk (prefill.cpp)
+                 if (!st.sp.init(st.wt, g, st.ss, srcp, &st.cache, host_res.data(), o.prefill_chunk, (void*) st.stream,
+-                                err, sb, sbb)) {
++                                err, sb, sbb, o.prefill_head_alias)) {
+                     err = "layer split, CUDA" + std::to_string(st.dev) + " prompt path: " + err;
+                     return err.find("do not fit") != std::string::npos ? 2 : 1;
+                 }
+             }
+             if (multi_gpu) sp.set_stage(0, split_at[0], &stages[0]->sp);
+             if (share_pool) sp.set_cpu_pool(&pool);
++            int cur_dev = 0;
++            cudaGetDevice(&cur_dev);   // the device this path is about to run on (dev -1: the current one)
++            const bool room_here = mtp_room_slots > 0 && mtp.device() == cur_dev;
++            if (room_here) room_path = &sp;
++            sp.set_ring_room(room_here ? mtp_room_slots : 0);
++            sp.set_ring_room_base(room_here ? mtp.experts_base() : nullptr, room_here ? mtp.experts_bytes() : 0);
+             if (!sp.init(wt, g, ss, prefill_src, &xcache, host_res.data(), o.prefill_chunk, main_cs, err, borrow, borrow_bytes,
+                          o.prefill_head_alias))
+                 return err.find("do not fit") != std::string::npos ? 2 : 1;
++            if (mtp_room_slots > 0 && room_path == nullptr)   // the drafter's card holds none of the prompt paths
++                std::fprintf(stderr, "strata serve: prompt room: no prompt path runs on CUDA%d, the drafter's card: the "
++                                     "prompt reads with its own ring\n", mtp.device());
+             return 0;
+         };
+         static constexpr int64_t kStepChunks[] = {6144, 4096, 3072, 2048, 1536, 1024, 512};
+@@ -8299,26 +8362,32 @@ int main(int argc, char** argv) {
+                                      "context, or read prompts in smaller chunks (--prefill 512)\n");
+             return 1;
+         }
+-        if (peer.valid() && o.peer_prefill_rows != 0) {
+-            const int64_t rows = o.peer_prefill_rows > 0 ? o.peer_prefill_rows : o.prefill_chunk * K / 2;
+-            if (!sp.set_peer(&peer, rows, err)) {
+-                std::fprintf(stderr, "strata serve: %s - the prompt path stays on the primary GPU\n", err.c_str());
+-                err.clear();
+-            }
+-        }
+-        // a layer split: a one-chunk prompt runs the stages one after the other, so each stage's prompt path gets the
+-        // next stage's GPU (the last one the first's) to stream and compute a share of its experts meanwhile
+-        if (multi_gpu && !stages.empty()) {
+-            std::vector<std::pair<strata::prefill::Prefill*, int>> paths{{&sp, 0}};
+-            for (const auto& st : stages) paths.emplace_back(&st->sp, st->dev);
+-            for (size_t i = 0; i < paths.size(); ++i) {
+-                const strata::core::OnDevice on(paths[i].second);
+-                if (!paths[i].first->set_stage_helper(paths[(i + 1) % paths.size()].first, err)) {
+-                    std::fprintf(stderr, "strata serve: %s - stage %zu reads its prompts alone\n", err.c_str(), i);
++        // The peer's streaming and a split's helpers live INSIDE the layout (`set_peer` / `set_stage_helper` build
++        // them in the path's own Impl), so a path that is laid out again - the prompt room, below - has to be armed
++        // again.  Both calls start by dropping what they built before, and both leave `err` clear on a decline.
++        auto arm_prompt_helpers = [&]() {
++            if (peer.valid() && o.peer_prefill_rows != 0) {
++                const int64_t rows = o.peer_prefill_rows > 0 ? o.peer_prefill_rows : o.prefill_chunk * K / 2;
++                if (!sp.set_peer(&peer, rows, err)) {
++                    std::fprintf(stderr, "strata serve: %s - the prompt path stays on the primary GPU\n", err.c_str());
+                     err.clear();
+                 }
+             }
+-        }
++            // a layer split: a one-chunk prompt runs the stages one after the other, so each stage's prompt path gets the
++            // next stage's GPU (the last one the first's) to stream and compute a share of its experts meanwhile
++            if (multi_gpu && !stages.empty()) {
++                std::vector<std::pair<strata::prefill::Prefill*, int>> paths{{&sp, 0}};
++                for (const auto& st : stages) paths.emplace_back(&st->sp, st->dev);
++                for (size_t i = 0; i < paths.size(); ++i) {
++                    const strata::core::OnDevice on(paths[i].second);
++                    if (!paths[i].first->set_stage_helper(paths[(i + 1) % paths.size()].first, err)) {
++                        std::fprintf(stderr, "strata serve: %s - stage %zu reads its prompts alone\n", err.c_str(), i);
++                        err.clear();
++                    }
++                }
++            }
++        };
++        arm_prompt_helpers();
+         mem_mark("the head and the prompt path");
+         // #340: STRATA_SPLIT_SMALL_OWN=S (tokens): on a layer split, every stage that borrows keeps the slots for an
+         // S-token chunk's buffers for the whole session (0.1.29's own buffers, carved from the tail of its cache):
+@@ -11858,6 +11927,48 @@ int main(int argc, char** argv) {
+                 std::printf("ERR %s\n", err.c_str());
+                 return 1;
+             }
++            // STRATA_MTP_ROOM_MIN: this request points the prompt path's ring at the drafter's experts, if it reads
++            // enough new tokens and the room applies here.  The open is below, once `read_from` is known: the
++            // threshold counts the tokens the request reads, not the whole prompt (a reused conversation prefix buys
++            // nothing from the room).  Nothing is laid out again - the room's slots are the drafter's own bytes
++            // (Prefill::set_ring_room_base) - and `room_close` below gives the decode its contents back before the
++            // first window.  A room left open by an earlier request (a cancelled prompt) is closed first.
++            bool mtp_room_open = mtp_room_slots > 0 && room_path != nullptr && !mtp.experts_resident();
++            auto head_restore = [&]() -> int {
++                if (!o.prefill_head_alias || native_head.loaded()) return 0;
++                sp.reset();
++                const auto head_t0 = Clock::now();
++                if (!native_head.load(o.native_head_shards, g.n_embd, n_vocab, err)) {
++                    std::printf("ERR restoring the native output head failed: %s\n", err.c_str());
++                    return 1;
++                }
++                // the verify windows' captured graphs read the head at the address of their capture
++                if (prefill_head_alias_at == nullptr) prefill_head_alias_at = native_head.weights();
++                if (native_head.weights() != prefill_head_alias_at) {
++                    std::printf("ERR --prefill-head-alias: the output head was reloaded at another address, so the "
++                                "captured verify graphs would read freed memory\n");
++                    return 1;
++                }
++                std::fprintf(stderr, "strata serve: --prefill-head-alias: output head restored in %.1f ms before decode\n",
++                             std::chrono::duration<double, std::milli>(Clock::now() - head_t0).count());
++                return 0;
++            };
++            auto room_close = [&](const char* why) -> int {
++                const auto t0 = Clock::now();
++                if (room_path != nullptr) {
++                    // the ring goes back to the rule's count FIRST: nothing after this can stage into the lender's
++                    // bytes, and the streams are idle before they are written over (a prompt pass reads them)
++                    if (!room_path->idle(err)) { std::printf("ERR %s\n", err.c_str()); return 1; }
++                    room_path->set_ring_room_active(false);
++                }
++                if (!mtp.experts_reclaim(err)) { std::printf("ERR %s\n", err.c_str()); return 1; }
++                mtp_room_open = false;
++                std::fprintf(stderr, "strata serve: prompt room (%s): the drafter's experts are the decode's again in "
++                                     "%.1f ms\n", why,
++                             std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
++                return 0;
++            };
++            if (mtp_room_open && room_close("left open") != 0) return 1;
+             if (o.prefill_head_alias && native_head.loaded()) {
+                 const auto head_t0 = Clock::now();
+                 native_head.unload();
+@@ -11866,6 +11977,7 @@ int main(int argc, char** argv) {
+                     std::printf("ERR rebuilding the head-alias prompt path failed: %s\n", err.c_str());
+                     return 1;
+                 }
++                arm_prompt_helpers();   // the rebuild above dropped them (they live inside the layout)
+                 std::fprintf(stderr, "strata serve: --prefill-head-alias: prompt workspace rebuilt in %.1f ms\n",
+                              std::chrono::duration<double, std::milli>(Clock::now() - head_t0).count());
+             }
+@@ -12367,6 +12479,23 @@ int main(int argc, char** argv) {
+             req_times = ReqTimes{};
+             if (use_mtp) mtp.set_prompt_len(n);
+             const int64_t read_from = reread_to > 0 ? 0 : resume;
++            // STRATA_MTP_ROOM_MIN: opened here, once the reused prefix is known - the threshold counts the tokens this
++            // request reads (an agent turn on a long conversation reads a few hundred and gains nothing from the room).
++            // Before `lend()` below, so a relayout re-carves with the room (its slots are the drafter's own bytes).
++            if (mtp_room_slots > 0 && room_path != nullptr && n - read_from >= mtp_room_min && mtp.experts_resident()) {
++                const auto room_t0 = Clock::now();
++                if (!mtp.experts_lend(err)) {
++                    std::fprintf(stderr, "strata serve: prompt room: %s: this prompt reads as it always did\n", err.c_str());
++                } else {
++                    room_path->set_ring_room_active(true);   // before the loan: a relayout re-carves with the room
++                    mtp_room_open = true;
++                    std::fprintf(stderr, "strata serve: prompt room: %lld tokens to read, the prompt path's ring is the "
++                                         "drafter's %llu MiB (%d slots past its own, lent in %.1f ms)\n",
++                                 (long long) (n - read_from),
++                                 (unsigned long long) (mtp.experts_bytes() >> 20), mtp_room_slots,
++                                 std::chrono::duration<double, std::milli>(Clock::now() - room_t0).count());
++                }
++            }
+             conversations.limit_reuse(read_from);
+             pp_total = n;
+             pp_from = read_from;
+@@ -12683,7 +12812,9 @@ int main(int argc, char** argv) {
+                     const strata::core::OnDevice on(p.dev);
+                     int64_t want_p = want;
+                     int32_t first = p.first_now;
+-                    // --prefill-head-alias: the loan laid out at start (slot 1 on) is kept; a hybrid layout cannot relayout
++                    // --prefill-head-alias: the loan laid out at start (slot 1 on) is kept; a hybrid layout cannot relayout.
++                    // (STRATA_MTP_ROOM_MIN's room is not one: its slots are the drafter's own bytes, so a roomed
++                    // request lends and is laid out exactly as any other - a relayout re-carves the room with it.)
+                     if (!o.prefill_head_alias) {
+                         // #2090: the loan a chunk needs is NOT monotonic in the chunk: a chunk above the scan's small_max
+                         // lays out the byte-budget ring (199 slots at 5120), one at or below it 0.1.39's (384 at 4096), so
+@@ -13455,23 +13586,8 @@ int main(int argc, char** argv) {
+                 std::printf("ERR refilling a lent slot failed: %s\n", err.c_str());
+                 return 1;
+             }
+-            if (o.prefill_head_alias) {
+-                sp.reset();
+-                const auto head_t0 = Clock::now();
+-                if (!native_head.load(o.native_head_shards, g.n_embd, n_vocab, err)) {
+-                    std::printf("ERR restoring the native output head failed: %s\n", err.c_str());
+-                    return 1;
+-                }
+-                // the verify windows' captured graphs read the head at the address of their capture
+-                if (prefill_head_alias_at == nullptr) prefill_head_alias_at = native_head.weights();
+-                if (native_head.weights() != prefill_head_alias_at) {
+-                    std::printf("ERR --prefill-head-alias: the output head was reloaded at another address, so the "
+-                                "captured verify graphs would read freed memory\n");
+-                    return 1;
+-                }
+-                std::fprintf(stderr, "strata serve: --prefill-head-alias: output head restored in %.1f ms before decode\n",
+-                             std::chrono::duration<double, std::milli>(Clock::now() - head_t0).count());
+-            }
++            if (mtp_room_open && room_close("prompt done") != 0) return 1;
++            if (head_restore() != 0) return 1;
+             tr("prompt done (slots refilled)");
+             if (il_parts > 0)
+                 std::fprintf(stderr, "strata batch: the prompt was read in %lld parts, the slots decoding %.0f ms between "

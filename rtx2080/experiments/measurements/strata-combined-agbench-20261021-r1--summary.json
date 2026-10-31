@@ -1,0 +1,627 @@
+{
+  "complete": true,
+  "phase": "complete",
+  "arms": {
+    "current": {
+      "agbench": {
+        "tasks": [
+          {
+            "model": "current",
+            "task": "task1-js-bugfix",
+            "passed": true,
+            "wall_s": 48,
+            "suspect_garbage_pass": false,
+            "tool_calls": 34,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 10,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task1-js-bugfix"
+          },
+          {
+            "model": "current",
+            "task": "task10-tb-bank-trans-filter",
+            "passed": true,
+            "wall_s": 69,
+            "suspect_garbage_pass": false,
+            "tool_calls": 33,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 9,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task10-tb-bank-trans-filter"
+          },
+          {
+            "model": "current",
+            "task": "task11-tb-assign-seats",
+            "passed": true,
+            "wall_s": 74,
+            "suspect_garbage_pass": false,
+            "tool_calls": 32,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 8,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task11-tb-assign-seats"
+          },
+          {
+            "model": "current",
+            "task": "task2-react-fix",
+            "passed": true,
+            "wall_s": 72,
+            "suspect_garbage_pass": false,
+            "tool_calls": 42,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 12,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task2-react-fix"
+          },
+          {
+            "model": "current",
+            "task": "task3-dep-upgrade",
+            "passed": true,
+            "wall_s": 71,
+            "suspect_garbage_pass": false,
+            "tool_calls": 49,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 12,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task3-dep-upgrade"
+          },
+          {
+            "model": "current",
+            "task": "task4-python-bugfix",
+            "passed": true,
+            "wall_s": 19,
+            "suspect_garbage_pass": false,
+            "tool_calls": 12,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 3,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task4-python-bugfix"
+          },
+          {
+            "model": "current",
+            "task": "task5-js-to-ts",
+            "passed": true,
+            "wall_s": 42,
+            "suspect_garbage_pass": false,
+            "tool_calls": 28,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 7,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task5-js-to-ts"
+          },
+          {
+            "model": "current",
+            "task": "task6-extra-code-task",
+            "passed": true,
+            "wall_s": 44,
+            "suspect_garbage_pass": false,
+            "tool_calls": 21,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 6,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task6-extra-code-task"
+          },
+          {
+            "model": "current",
+            "task": "task7-long-context-agent",
+            "passed": true,
+            "wall_s": 49,
+            "suspect_garbage_pass": false,
+            "tool_calls": 39,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 12,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task7-long-context-agent"
+          },
+          {
+            "model": "current",
+            "task": "task8-tb-broken-python",
+            "passed": true,
+            "wall_s": 375,
+            "suspect_garbage_pass": false,
+            "tool_calls": 155,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 30,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task8-tb-broken-python"
+          },
+          {
+            "model": "current",
+            "task": "task9-tb-analyze-access-logs",
+            "passed": true,
+            "wall_s": 35,
+            "suspect_garbage_pass": false,
+            "tool_calls": 36,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 8,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/current/task9-tb-analyze-access-logs"
+          }
+        ],
+        "passed": 11,
+        "passed_excluding_task8": 10,
+        "task_wall_seconds": 898,
+        "task_wall_seconds_excluding_task8": 523,
+        "generated_tokens": 32228,
+        "decode_seconds": 616.858,
+        "prompt_read_tokens": 81585,
+        "prompt_seconds": 199.155,
+        "engine_requests": 99,
+        "excluded_warmup": [
+          1556,
+          0,
+          1556,
+          3025,
+          14,
+          349
+        ],
+        "raw_result": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-combined-agbench-20261021-r1/raw-results/current-20261021-125858.jsonl",
+        "aggregate_decode_tps": 52.24541142369881
+      },
+      "speed": {
+        "chat": {
+          "requests": 9,
+          "failed": 0,
+          "median_wall_s": 2.779,
+          "median_ttft_s": 0.804,
+          "median_prefill_tps": 59.5,
+          "median_decode_tps": 47.9
+        },
+        "prefill": {
+          "4K": {
+            "requests": 3,
+            "failed": 0,
+            "median_wall_s": 6.502,
+            "median_ttft_s": 6.009,
+            "median_prefill_tps": 672.5,
+            "median_decode_tps": 46.6
+          },
+          "16K": {
+            "requests": 3,
+            "failed": 0,
+            "median_wall_s": 23.629,
+            "median_ttft_s": 23.218,
+            "median_prefill_tps": 692.7,
+            "median_decode_tps": 53.2
+          },
+          "32K": {
+            "requests": 3,
+            "failed": 0,
+            "median_wall_s": 47.086,
+            "median_ttft_s": 46.555,
+            "median_prefill_tps": 689.2,
+            "median_decode_tps": 45.0
+          }
+        },
+        "agent_followups": {
+          "requests": 15,
+          "failed": 0,
+          "median_wall_s": 5.474,
+          "median_ttft_s": 5.071,
+          "median_prefill_tps": 559.8,
+          "median_decode_tps": 46.4
+        },
+        "reported_failures": []
+      }
+    },
+    "patched": {
+      "agbench": {
+        "tasks": [
+          {
+            "model": "patched",
+            "task": "task1-js-bugfix",
+            "passed": true,
+            "wall_s": 30,
+            "suspect_garbage_pass": false,
+            "tool_calls": 21,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 6,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task1-js-bugfix"
+          },
+          {
+            "model": "patched",
+            "task": "task10-tb-bank-trans-filter",
+            "passed": true,
+            "wall_s": 104,
+            "suspect_garbage_pass": false,
+            "tool_calls": 42,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 11,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task10-tb-bank-trans-filter"
+          },
+          {
+            "model": "patched",
+            "task": "task11-tb-assign-seats",
+            "passed": true,
+            "wall_s": 51,
+            "suspect_garbage_pass": false,
+            "tool_calls": 19,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 4,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task11-tb-assign-seats"
+          },
+          {
+            "model": "patched",
+            "task": "task2-react-fix",
+            "passed": true,
+            "wall_s": 73,
+            "suspect_garbage_pass": false,
+            "tool_calls": 33,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 9,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task2-react-fix"
+          },
+          {
+            "model": "patched",
+            "task": "task3-dep-upgrade",
+            "passed": true,
+            "wall_s": 92,
+            "suspect_garbage_pass": false,
+            "tool_calls": 63,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 14,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task3-dep-upgrade"
+          },
+          {
+            "model": "patched",
+            "task": "task4-python-bugfix",
+            "passed": true,
+            "wall_s": 21,
+            "suspect_garbage_pass": false,
+            "tool_calls": 12,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 3,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task4-python-bugfix"
+          },
+          {
+            "model": "patched",
+            "task": "task5-js-to-ts",
+            "passed": true,
+            "wall_s": 37,
+            "suspect_garbage_pass": false,
+            "tool_calls": 29,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 5,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task5-js-to-ts"
+          },
+          {
+            "model": "patched",
+            "task": "task6-extra-code-task",
+            "passed": true,
+            "wall_s": 35,
+            "suspect_garbage_pass": false,
+            "tool_calls": 19,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 5,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task6-extra-code-task"
+          },
+          {
+            "model": "patched",
+            "task": "task7-long-context-agent",
+            "passed": true,
+            "wall_s": 74,
+            "suspect_garbage_pass": false,
+            "tool_calls": 47,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 14,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task7-long-context-agent"
+          },
+          {
+            "model": "patched",
+            "task": "task8-tb-broken-python",
+            "passed": true,
+            "wall_s": 236,
+            "suspect_garbage_pass": false,
+            "tool_calls": 133,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 27,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task8-tb-broken-python"
+          },
+          {
+            "model": "patched",
+            "task": "task9-tb-analyze-access-logs",
+            "passed": true,
+            "wall_s": 31,
+            "suspect_garbage_pass": false,
+            "tool_calls": 27,
+            "finish": "unknown",
+            "zero_byte_retry": false,
+            "raw_passed": true,
+            "actual_tool_calls": 6,
+            "immutable_violations": [],
+            "agent_errors": [],
+            "workdir": "/tmp/agentic-run/strata-combined-20261021-r1/patched/task9-tb-analyze-access-logs"
+          }
+        ],
+        "passed": 11,
+        "passed_excluding_task8": 10,
+        "task_wall_seconds": 784,
+        "task_wall_seconds_excluding_task8": 548,
+        "generated_tokens": 30388,
+        "decode_seconds": 577.087,
+        "prompt_read_tokens": 63460,
+        "prompt_seconds": 165.663,
+        "engine_requests": 95,
+        "excluded_warmup": [
+          1556,
+          0,
+          1556,
+          3470,
+          13,
+          402
+        ],
+        "raw_result": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-combined-agbench-20261021-r1/raw-results/patched-20261021-131510.jsonl",
+        "aggregate_decode_tps": 52.657571562000186
+      },
+      "speed": {
+        "chat": {
+          "requests": 9,
+          "failed": 0,
+          "median_wall_s": 2.727,
+          "median_ttft_s": 0.729,
+          "median_prefill_tps": 67.3,
+          "median_decode_tps": 48.9
+        },
+        "prefill": {
+          "4K": {
+            "requests": 3,
+            "failed": 0,
+            "median_wall_s": 6.5,
+            "median_ttft_s": 6.0,
+            "median_prefill_tps": 674.0,
+            "median_decode_tps": 46.0
+          },
+          "16K": {
+            "requests": 3,
+            "failed": 0,
+            "median_wall_s": 19.182,
+            "median_ttft_s": 18.743,
+            "median_prefill_tps": 859.1,
+            "median_decode_tps": 47.8
+          },
+          "32K": {
+            "requests": 3,
+            "failed": 0,
+            "median_wall_s": 38.132,
+            "median_ttft_s": 37.568,
+            "median_prefill_tps": 854.5,
+            "median_decode_tps": 39.7
+          }
+        },
+        "agent_followups": {
+          "requests": 15,
+          "failed": 0,
+          "median_wall_s": 5.824,
+          "median_ttft_s": 5.081,
+          "median_prefill_tps": 559.0,
+          "median_decode_tps": 46.9
+        },
+        "reported_failures": []
+      }
+    }
+  },
+  "direct": {
+    "current": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 34.08532117999857,
+          "prefill_tps": 94.6,
+          "decode_tps": 61.5,
+          "input_tokens": 76,
+          "reused_tokens": 0,
+          "output_tokens": 2048,
+          "retrieval_pass": null
+        },
+        "decode-prose": {
+          "wall_s": 39.9166351519998,
+          "prefill_tps": 87.8,
+          "decode_tps": 52.4,
+          "input_tokens": 72,
+          "reused_tokens": 0,
+          "output_tokens": 2048,
+          "retrieval_pass": null
+        },
+        "code-25k": {
+          "wall_s": 29.919160322999232,
+          "prefill_tps": 692.7,
+          "decode_tps": 43.9,
+          "input_tokens": 20064,
+          "reused_tokens": 0,
+          "output_tokens": 40,
+          "retrieval_pass": null
+        },
+        "code-100k": {
+          "wall_s": 177.8529144899985,
+          "prefill_tps": 690.8,
+          "decode_tps": 45.9,
+          "input_tokens": 121788,
+          "reused_tokens": 0,
+          "output_tokens": 64,
+          "retrieval_pass": null
+        },
+        "cached-followup": {
+          "wall_s": 6.710761489001015,
+          "prefill_tps": 59.4,
+          "decode_tps": 44.0,
+          "input_tokens": 50,
+          "reused_tokens": 121852,
+          "output_tokens": 256,
+          "retrieval_pass": null
+        },
+        "needle-code": {
+          "wall_s": 29.989878022002813,
+          "prefill_tps": 655.3,
+          "decode_tps": 49.2,
+          "input_tokens": 19468,
+          "reused_tokens": 0,
+          "output_tokens": 13,
+          "retrieval_pass": true
+        },
+        "needle-long": {
+          "wall_s": 177.38594607499908,
+          "prefill_tps": 685.7,
+          "decode_tps": 47.7,
+          "input_tokens": 121187,
+          "reused_tokens": 0,
+          "output_tokens": 26,
+          "retrieval_pass": true
+        }
+      },
+      "sustained_decode": {
+        "tokens": 4096,
+        "tokens_per_second": 56.59874172816851,
+        "ms_per_target_round_proxy": 45.0056592039801
+      }
+    },
+    "patched": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 33.79758116700032,
+          "prefill_tps": 102.6,
+          "decode_tps": 62.0,
+          "input_tokens": 76,
+          "reused_tokens": 0,
+          "output_tokens": 2048,
+          "retrieval_pass": null
+        },
+        "decode-prose": {
+          "wall_s": 40.36426888399728,
+          "prefill_tps": 81.4,
+          "decode_tps": 51.9,
+          "input_tokens": 72,
+          "reused_tokens": 0,
+          "output_tokens": 2048,
+          "retrieval_pass": null
+        },
+        "code-25k": {
+          "wall_s": 24.93642661100239,
+          "prefill_tps": 825.8,
+          "decode_tps": 50.3,
+          "input_tokens": 20064,
+          "reused_tokens": 0,
+          "output_tokens": 30,
+          "retrieval_pass": null
+        },
+        "code-100k": {
+          "wall_s": 147.04336620399772,
+          "prefill_tps": 836.3,
+          "decode_tps": 49.4,
+          "input_tokens": 121788,
+          "reused_tokens": 0,
+          "output_tokens": 62,
+          "retrieval_pass": null
+        },
+        "cached-followup": {
+          "wall_s": 6.512379609997879,
+          "prefill_tps": 62.9,
+          "decode_tps": 45.2,
+          "input_tokens": 50,
+          "reused_tokens": 121850,
+          "output_tokens": 256,
+          "retrieval_pass": null
+        },
+        "needle-code": {
+          "wall_s": 24.93864254899745,
+          "prefill_tps": 792.3,
+          "decode_tps": 37.4,
+          "input_tokens": 19468,
+          "reused_tokens": 0,
+          "output_tokens": 13,
+          "retrieval_pass": true
+        },
+        "needle-long": {
+          "wall_s": 145.66228619600224,
+          "prefill_tps": 835.9,
+          "decode_tps": 45.3,
+          "input_tokens": 121187,
+          "reused_tokens": 0,
+          "output_tokens": 26,
+          "retrieval_pass": true
+        }
+      },
+      "sustained_decode": {
+        "tokens": 4096,
+        "tokens_per_second": 56.474818655993076,
+        "ms_per_target_round_proxy": 45.443546365914784
+      }
+    }
+  },
+  "ag_comparison": {
+    "wall_reduction_pct_excluding_task8": -4.780114722753348,
+    "all_task_wall_reduction_pct": 12.694877505567925,
+    "aggregate_decode_change_pct": 0.7888925114568401
+  }
+}

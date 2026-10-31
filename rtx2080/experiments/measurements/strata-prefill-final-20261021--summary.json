@@ -1,0 +1,448 @@
+{
+  "arms": {
+    "screen-base-first": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 18.745284050997725,
+          "prompt_tokens": 75,
+          "cache_tokens": 0,
+          "prefill_tps": 87.8,
+          "output_tokens": 1024,
+          "decode_tps": 57.2,
+          "needle_ok": null
+        },
+        "decode-prose": {
+          "wall_s": 21.574239966001187,
+          "prompt_tokens": 71,
+          "cache_tokens": 0,
+          "prefill_tps": 50.7,
+          "output_tokens": 1024,
+          "decode_tps": 50.8,
+          "needle_ok": null
+        },
+        "code-25k": {
+          "wall_s": 29.588144811998063,
+          "prompt_tokens": 20063,
+          "cache_tokens": 0,
+          "prefill_tps": 697.2,
+          "output_tokens": 40,
+          "decode_tps": 51.4,
+          "needle_ok": null
+        },
+        "needle-code": {
+          "wall_s": 29.091719052998087,
+          "prompt_tokens": 19467,
+          "cache_tokens": 0,
+          "prefill_tps": 675.0,
+          "output_tokens": 13,
+          "decode_tps": 55.6,
+          "needle_ok": true
+        }
+      },
+      "sustained_decode_tps": 53.815429892789574,
+      "coding": []
+    },
+    "screen-pa": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 17.58576690100017,
+          "prompt_tokens": 75,
+          "cache_tokens": 0,
+          "prefill_tps": 93.0,
+          "output_tokens": 1024,
+          "decode_tps": 61.0,
+          "needle_ok": null
+        },
+        "decode-prose": {
+          "wall_s": 20.533070659002988,
+          "prompt_tokens": 71,
+          "cache_tokens": 0,
+          "prefill_tps": 53.1,
+          "output_tokens": 1024,
+          "decode_tps": 53.4,
+          "needle_ok": null
+        },
+        "code-25k": {
+          "wall_s": 30.117833521999273,
+          "prompt_tokens": 20063,
+          "cache_tokens": 0,
+          "prefill_tps": 682.3,
+          "output_tokens": 30,
+          "decode_tps": 44.3,
+          "needle_ok": null
+        },
+        "needle-code": {
+          "wall_s": 29.780208639000193,
+          "prompt_tokens": 19467,
+          "cache_tokens": 0,
+          "prefill_tps": 660.6,
+          "output_tokens": 13,
+          "decode_tps": 44.0,
+          "needle_ok": true
+        }
+      },
+      "sustained_decode_tps": 56.94187646838029,
+      "coding": []
+    },
+    "screen-bf16": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 18.094107585999154,
+          "prompt_tokens": 75,
+          "cache_tokens": 0,
+          "prefill_tps": 115.3,
+          "output_tokens": 1024,
+          "decode_tps": 58.7,
+          "needle_ok": null
+        },
+        "decode-prose": {
+          "wall_s": 20.530062652000197,
+          "prompt_tokens": 71,
+          "cache_tokens": 0,
+          "prefill_tps": 45.9,
+          "output_tokens": 1024,
+          "decode_tps": 54.0,
+          "needle_ok": null
+        },
+        "code-25k": {
+          "wall_s": 29.84227223200287,
+          "prompt_tokens": 20063,
+          "cache_tokens": 0,
+          "prefill_tps": 689.1,
+          "output_tokens": 30,
+          "decode_tps": 43.4,
+          "needle_ok": null
+        },
+        "needle-code": {
+          "wall_s": 29.317857482001273,
+          "prompt_tokens": 19467,
+          "cache_tokens": 0,
+          "prefill_tps": 669.8,
+          "output_tokens": 13,
+          "decode_tps": 54.6,
+          "needle_ok": true
+        }
+      },
+      "sustained_decode_tps": 56.23253029911973,
+      "coding": []
+    },
+    "screen-base-last": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 18.187023880000197,
+          "prompt_tokens": 75,
+          "cache_tokens": 0,
+          "prefill_tps": 93.8,
+          "output_tokens": 1024,
+          "decode_tps": 58.9,
+          "needle_ok": null
+        },
+        "decode-prose": {
+          "wall_s": 20.50256933700075,
+          "prompt_tokens": 71,
+          "cache_tokens": 0,
+          "prefill_tps": 52.0,
+          "output_tokens": 1024,
+          "decode_tps": 53.5,
+          "needle_ok": null
+        },
+        "code-25k": {
+          "wall_s": 29.605559269999503,
+          "prompt_tokens": 20063,
+          "cache_tokens": 0,
+          "prefill_tps": 693.6,
+          "output_tokens": 30,
+          "decode_tps": 46.5,
+          "needle_ok": null
+        },
+        "needle-code": {
+          "wall_s": 29.145547373002046,
+          "prompt_tokens": 19467,
+          "cache_tokens": 0,
+          "prefill_tps": 673.9,
+          "output_tokens": 13,
+          "decode_tps": 53.9,
+          "needle_ok": true
+        }
+      },
+      "sustained_decode_tps": 56.08653977817335,
+      "coding": []
+    },
+    "validate-loans": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 35.18251716799932,
+          "prompt_tokens": 75,
+          "cache_tokens": 0,
+          "prefill_tps": 97.7,
+          "output_tokens": 2048,
+          "decode_tps": 59.5,
+          "needle_ok": null
+        },
+        "decode-prose": {
+          "wall_s": 40.320492679999006,
+          "prompt_tokens": 71,
+          "cache_tokens": 0,
+          "prefill_tps": 45.1,
+          "output_tokens": 2048,
+          "decode_tps": 52.9,
+          "needle_ok": null
+        },
+        "code-25k": {
+          "wall_s": 24.81930096799988,
+          "prompt_tokens": 20063,
+          "cache_tokens": 0,
+          "prefill_tps": 830.0,
+          "output_tokens": 30,
+          "decode_tps": 49.0,
+          "needle_ok": null
+        },
+        "code-100k": {
+          "wall_s": 146.75026842700026,
+          "prompt_tokens": 121787,
+          "cache_tokens": 0,
+          "prefill_tps": 838.8,
+          "output_tokens": 63,
+          "decode_tps": 45.2,
+          "needle_ok": null
+        },
+        "cached-followup": {
+          "wall_s": 7.342847371000971,
+          "prompt_tokens": 47,
+          "cache_tokens": 121850,
+          "prefill_tps": 40.9,
+          "output_tokens": 256,
+          "decode_tps": 41.7,
+          "needle_ok": null
+        },
+        "needle-code": {
+          "wall_s": 24.870858944002975,
+          "prompt_tokens": 19467,
+          "cache_tokens": 0,
+          "prefill_tps": 792.1,
+          "output_tokens": 13,
+          "decode_tps": 46.8,
+          "needle_ok": true
+        },
+        "needle-long": {
+          "wall_s": 145.8846604930004,
+          "prompt_tokens": 121186,
+          "cache_tokens": 0,
+          "prefill_tps": 834.9,
+          "output_tokens": 26,
+          "decode_tps": 42.0,
+          "needle_ok": true
+        }
+      },
+      "sustained_decode_tps": 55.99269470311295,
+      "coding": [
+        {
+          "event": "coding",
+          "label": "validate-loans",
+          "model": "validate-loans",
+          "task": "task1-js-bugfix",
+          "passed": true,
+          "wall_s": 40,
+          "suspect_garbage_pass": false,
+          "tool_calls": 26,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "protected_changes": [],
+          "actual_tool_calls": 8,
+          "agent_errors": [],
+          "at": 1792586878.3966696
+        },
+        {
+          "event": "coding",
+          "label": "validate-loans",
+          "model": "validate-loans",
+          "task": "task5-js-to-ts",
+          "passed": true,
+          "wall_s": 40,
+          "suspect_garbage_pass": false,
+          "tool_calls": 23,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "protected_changes": [],
+          "actual_tool_calls": 5,
+          "agent_errors": [],
+          "at": 1792586878.4033473
+        },
+        {
+          "event": "coding",
+          "label": "validate-loans",
+          "model": "validate-loans",
+          "task": "task7-long-context-agent",
+          "passed": true,
+          "wall_s": 69,
+          "suspect_garbage_pass": false,
+          "tool_calls": 38,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "protected_changes": [],
+          "actual_tool_calls": 11,
+          "agent_errors": [],
+          "at": 1792586878.417388
+        }
+      ]
+    },
+    "validate-current": {
+      "cases": {
+        "decode-code": {
+          "wall_s": 35.484599295003136,
+          "prompt_tokens": 75,
+          "cache_tokens": 0,
+          "prefill_tps": 93.9,
+          "output_tokens": 2048,
+          "decode_tps": 59.1,
+          "needle_ok": null
+        },
+        "decode-prose": {
+          "wall_s": 40.03556895500151,
+          "prompt_tokens": 71,
+          "cache_tokens": 0,
+          "prefill_tps": 54.2,
+          "output_tokens": 2048,
+          "decode_tps": 52.9,
+          "needle_ok": null
+        },
+        "code-25k": {
+          "wall_s": 29.724888816999737,
+          "prompt_tokens": 20063,
+          "cache_tokens": 0,
+          "prefill_tps": 693.8,
+          "output_tokens": 40,
+          "decode_tps": 51.8,
+          "needle_ok": null
+        },
+        "code-100k": {
+          "wall_s": 178.17774553699928,
+          "prompt_tokens": 121787,
+          "cache_tokens": 0,
+          "prefill_tps": 689.1,
+          "output_tokens": 64,
+          "decode_tps": 49.6,
+          "needle_ok": null
+        },
+        "cached-followup": {
+          "wall_s": 6.452423752001778,
+          "prompt_tokens": 47,
+          "cache_tokens": 121851,
+          "prefill_tps": 61.7,
+          "output_tokens": 256,
+          "decode_tps": 45.4,
+          "needle_ok": null
+        },
+        "needle-code": {
+          "wall_s": 30.12534812800004,
+          "prompt_tokens": 19467,
+          "cache_tokens": 0,
+          "prefill_tps": 652.0,
+          "output_tokens": 13,
+          "decode_tps": 51.3,
+          "needle_ok": true
+        },
+        "needle-long": {
+          "wall_s": 176.23947311200027,
+          "prompt_tokens": 121186,
+          "cache_tokens": 0,
+          "prefill_tps": 690.2,
+          "output_tokens": 26,
+          "decode_tps": 49.1,
+          "needle_ok": true
+        }
+      },
+      "sustained_decode_tps": 55.80168603922466,
+      "coding": [
+        {
+          "event": "coding",
+          "label": "validate-current",
+          "model": "validate-current",
+          "task": "task1-js-bugfix",
+          "passed": true,
+          "wall_s": 45,
+          "suspect_garbage_pass": false,
+          "tool_calls": 27,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "protected_changes": [],
+          "actual_tool_calls": 8,
+          "agent_errors": [],
+          "at": 1792587590.180495
+        },
+        {
+          "event": "coding",
+          "label": "validate-current",
+          "model": "validate-current",
+          "task": "task5-js-to-ts",
+          "passed": true,
+          "wall_s": 35,
+          "suspect_garbage_pass": false,
+          "tool_calls": 23,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "protected_changes": [],
+          "actual_tool_calls": 6,
+          "agent_errors": [],
+          "at": 1792587590.1870484
+        },
+        {
+          "event": "coding",
+          "label": "validate-current",
+          "model": "validate-current",
+          "task": "task7-long-context-agent",
+          "passed": true,
+          "wall_s": 58,
+          "suspect_garbage_pass": false,
+          "tool_calls": 54,
+          "finish": "unknown",
+          "zero_byte_retry": false,
+          "protected_changes": [],
+          "actual_tool_calls": 12,
+          "agent_errors": [],
+          "at": 1792587590.1989164
+        }
+      ]
+    }
+  },
+  "completed_phases": [
+    "screen",
+    "validate"
+  ],
+  "failures": [],
+  "screen_wall_change_pct": {
+    "screen-pa": 1.760259774515216,
+    "screen-bf16": 0.8292104534094458
+  },
+  "validation_changes": {
+    "decode-code": {
+      "wall_change_pct": -0.8513048843878379,
+      "prefill_change_pct": 4.046858359957395
+    },
+    "decode-prose": {
+      "wall_change_pct": 0.7116764727828517,
+      "prefill_change_pct": -16.78966789667897
+    },
+    "code-25k": {
+      "wall_change_pct": -16.50330091796455,
+      "prefill_change_pct": 19.631017584318244
+    },
+    "code-100k": {
+      "wall_change_pct": -17.63827295899475,
+      "prefill_change_pct": 21.723987810187182
+    },
+    "cached-followup": {
+      "wall_change_pct": 13.799831710106636,
+      "prefill_change_pct": -33.71150729335495
+    },
+    "needle-code": {
+      "wall_change_pct": -17.442086184933657,
+      "prefill_change_pct": 21.487730061349698
+    },
+    "needle-long": {
+      "wall_change_pct": -17.223617435413786,
+      "prefill_change_pct": 20.96493769921761
+    }
+  },
+  "validation_decode_change_pct": 0.342299090665521
+}

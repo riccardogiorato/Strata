@@ -1,0 +1,100 @@
+{
+  "long_context": {
+    "stock": {
+      "n": 2,
+      "prefill_tps": 591.196577895367,
+      "decode_tps": 57.299257668723925,
+      "wall_s_mean": 232.3010968780145,
+      "wall_s_individual": [
+        231.8584317630157,
+        232.74376199301332
+      ],
+      "prompt_tps_individual": [
+        592.3,
+        590.1
+      ],
+      "output_tokens": [
+        1433,
+        1433
+      ],
+      "output_hashes": [
+        "4e9f4da909eb80ddf8447f462dddb576b3ce958cc5260468cbf7f76782bd6ab9",
+        "4e9f4da909eb80ddf8447f462dddb576b3ce958cc5260468cbf7f76782bd6ab9"
+      ]
+    },
+    "pr3277": {
+      "n": 2,
+      "prefill_tps": 600.4682584380548,
+      "decode_tps": 56.45210533261636,
+      "wall_s_mean": 229.49612465249083,
+      "wall_s_individual": [
+        229.94153840999934,
+        229.05071089498233
+      ],
+      "prompt_tps_individual": [
+        600.6,
+        600.4
+      ],
+      "output_tokens": [
+        1433,
+        1433
+      ],
+      "output_hashes": [
+        "4e9f4da909eb80ddf8447f462dddb576b3ce958cc5260468cbf7f76782bd6ab9",
+        "4e9f4da909eb80ddf8447f462dddb576b3ce958cc5260468cbf7f76782bd6ab9"
+      ]
+    }
+  },
+  "standard": {},
+  "kernel_checks": [
+    {
+      "at": 1793019899.294964,
+      "event": "kernel_correctness",
+      "arm": "pr3277",
+      "exit": 0
+    }
+  ],
+  "correctness": [
+    {
+      "at": 1793020159.1998627,
+      "event": "edit_correctness",
+      "label": "long-edit-1-stock",
+      "arm": "stock",
+      "pass": true,
+      "error": null,
+      "reasoning_characters": 0
+    },
+    {
+      "at": 1793020420.4539344,
+      "event": "edit_correctness",
+      "label": "long-edit-2-pr3277",
+      "arm": "pr3277",
+      "pass": true,
+      "error": null,
+      "reasoning_characters": 0
+    },
+    {
+      "at": 1793020680.5495164,
+      "event": "edit_correctness",
+      "label": "long-edit-3-pr3277",
+      "arm": "pr3277",
+      "pass": true,
+      "error": null,
+      "reasoning_characters": 0
+    },
+    {
+      "at": 1793020944.3901966,
+      "event": "edit_correctness",
+      "label": "long-edit-4-stock",
+      "arm": "stock",
+      "pass": true,
+      "error": null,
+      "reasoning_characters": 0
+    }
+  ],
+  "pr_vs_stock_pct": {
+    "prefill_tps": 1.5682906311289102,
+    "decode_tps": -1.4784700021863828,
+    "wall_s_mean": -1.2074726564879734
+  }
+}

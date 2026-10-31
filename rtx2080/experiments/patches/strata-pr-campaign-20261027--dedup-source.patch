@@ -1,0 +1,758 @@
+diff --git c/CMakeLists.txt w/CMakeLists.txt
+index 7ae5f1f..253ffb2 100644
+--- c/CMakeLists.txt
++++ w/CMakeLists.txt
+@@ -144,6 +144,11 @@ if(STRATA_BUILD_CONVERSATION_TESTS)
+   add_executable(session_save_reclaim_test src/core/session_save_reclaim_test.cpp src/core/conversation_file.cpp)
+   target_include_directories(session_save_reclaim_test PRIVATE include)
+   add_test(NAME session_save_reclaim_test COMMAND session_save_reclaim_test)
++  add_executable(conversation_storage_test tests/core/conversation_storage_test.cpp)
++  target_include_directories(conversation_storage_test PRIVATE include)
++  add_test(NAME conversation_storage_test COMMAND conversation_storage_test)
++  add_test(NAME conversation_storage_test_dedup COMMAND conversation_storage_test)
++  set_tests_properties(conversation_storage_test_dedup PROPERTIES ENVIRONMENT STRATA_PARKED_DEDUP=1)
+ endif()
+ 
+ if(STRATA_HIP_GFX906)
+diff --git c/include/strata/core/conversation_buffer.hpp w/include/strata/core/conversation_buffer.hpp
+index d8a4517..bbc5c0d 100644
+--- c/include/strata/core/conversation_buffer.hpp
++++ w/include/strata/core/conversation_buffer.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "strata/core/progress.hpp"
++#include "strata/core/conversation_storage.hpp"
+ 
+ #include <algorithm>
+ #include <cstddef>
+@@ -12,9 +13,7 @@
+ 
+ namespace strata::core {
+ 
+-// Snapshot-owned host storage. Appending never relocates existing payloads;
+-// only the small segment directory can move. No sharing or copy-on-write is
+-// needed because a parked image and its retained active buffers have one owner.
++// Snapshot storage: stable legacy segments or immutable blocks with copy-on-write.
+ class ConversationBuffer {
+ public:
+     static constexpr size_t segment_bytes = 16 * 1024 * 1024;
+@@ -39,6 +38,7 @@ public:
+ 
+     size_t size() const { return size_; }
+     bool empty() const { return size_ == 0; }
++    size_t directory_bytes() const { return segments_.capacity() * sizeof(Segment); }
+     size_t bytes() const {
+         size_t n = segments_.capacity() * sizeof(Segment);
+         for (const auto& segment : segments_) n += segment.capacity();
+@@ -46,7 +46,21 @@ public:
+     }
+     // Includes the old directory while reserve allocates its replacement.
+     // Saturation makes an overflowing estimate fail admission before resize.
+-    size_t allocation_peak(size_t n) const {
++    void freeze() { if (conversation_dedup_enabled()) for (auto& s : segments_) s.freeze(); }
++    template<class Fn> void for_each_bytes(Fn&& fn) const { for (const auto& s : segments_) fn(s); }
++    static constexpr size_t shared_block_bytes = 1 << 20;
++    // `keep`: leading bytes a capture retains unchanged (dedup mode only).
++    size_t allocation_peak(size_t n, size_t keep = 0) const {
++        if (conversation_dedup_enabled()) {
++            // This buffer is already charged where it lives. A capture adds the
++            // blocks from the one holding `keep` onwards and a new directory.
++            const size_t first = std::min(keep, size_) / shared_block_bytes * shared_block_bytes;
++            size_t total = n > first ? n - first : 0;
++            const size_t count = n / shared_block_bytes + (n % shared_block_bytes != 0);
++            if (count > SIZE_MAX / sizeof(Segment) || !add(total, count * sizeof(Segment)) ||
++                !add(total, directory_bytes())) return SIZE_MAX;
++            return total;
++        }
+         size_t total = bytes();
+         if (n <= size_) return total;
+         const size_t spare = segments_.empty() ? 0 : segments_.back().capacity() - segments_.back().size();
+@@ -62,6 +76,20 @@ public:
+         return total;
+     }
+     void resize(size_t n, uint8_t value = 0) {
++        if (conversation_dedup_enabled()) {
++            // Fixed boundaries allow sharing across different append histories.
++            const size_t count = n / shared_block_bytes + (n % shared_block_bytes != 0);
++            segments_.reserve(count);
++            while (segments_.size() > count) segments_.pop_back();
++            for (size_t i = 0; i < count; ++i) {
++                if (i == segments_.size()) segments_.emplace_back();
++                const size_t target = std::min(shared_block_bytes, n - i * shared_block_bytes);
++                segments_[i].reserve(target);
++                segments_[i].resize(target, value);
++            }
++            size_ = n;
++            return;
++        }
+         if (n > size_) {
+             const size_t held = size_;
+             const bool growing = held != 0;
+@@ -123,7 +151,7 @@ public:
+     }
+ 
+ private:
+-    using Segment = std::vector<uint8_t>;
++    using Segment = ConversationBytes;
+     // A fresh capture allocates exactly its payload. Later appends reserve
+     // geometrically growing segments, bounded by 16 MiB. Small chat turns then
+     // extend the final allocation instead of adding one transfer per turn.
+diff --git c/include/strata/core/conversation_cache.hpp w/include/strata/core/conversation_cache.hpp
+index b2e6a74..a803db3 100644
+--- c/include/strata/core/conversation_cache.hpp
++++ w/include/strata/core/conversation_cache.hpp
+@@ -9,6 +9,7 @@
+ #include <cstddef>
+ #include <cstdint>
+ #include <deque>
++#include <unordered_map>
+ #include <utility>
+ #include <vector>
+ 
+@@ -23,7 +24,7 @@ struct ConversationImageKey {
+ struct ConversationCheckpoint {
+     std::vector<int32_t> ids;
+     std::vector<ConversationImageKey> imgs;
+-    std::vector<uint8_t> gdn, ple, tails, dead, block_pos;
++    ConversationBytes gdn, ple, tails, dead, block_pos;
+     uint64_t used = 0; // upstream root-pinned/LRU checkpoint retention
+     // A shared-prefix pin (the request key pin=N): this checkpoint is the read-only prefix many suffix queries branch
+     // from, so retention never evicts it (conv_cache.hpp) and a parked conversation holding it stays parked.  A run-time
+@@ -43,6 +44,21 @@ struct ConversationCheckpoint {
+     // Whole-session parking is currently single-GPU and rejects these parts.
+     std::vector<ConversationCheckpoint> stage_parts;
+ 
++    void freeze() {
++        if (!conversation_dedup_enabled()) return;
++        gdn.freeze(); ple.freeze(); tails.freeze(); dead.freeze(); block_pos.freeze();
++        for (auto& part : stage_parts) part.freeze();
++    }
++    template<class Fn> void for_each_bytes(Fn&& fn) const {
++        fn(gdn); fn(ple); fn(tails); fn(dead); fn(block_pos);
++        for (const auto& part : stage_parts) part.for_each_bytes(fn);
++    }
++    size_t metadata_bytes() const {
++        size_t n = ids.capacity() * sizeof(int32_t) + imgs.capacity() * sizeof(ConversationImageKey) +
++                   stage_parts.capacity() * sizeof(ConversationCheckpoint);
++        for (const auto& part : stage_parts) n += part.metadata_bytes();
++        return n;
++    }
+     size_t bytes() const {
+         size_t n = ids.capacity() * sizeof(int32_t) + imgs.capacity() * sizeof(ConversationImageKey) +
+                gdn.capacity() + ple.capacity() + tails.capacity() + dead.capacity() + block_pos.capacity() +
+@@ -58,6 +74,15 @@ struct ConversationKv {
+     int format = 0;
+     int64_t cells = 0, heads = 0, head_dim = 0, page_size = 0, pooled_rows = 0, idx_dim = 0;
+     ConversationBuffer k, v, k_scale, v_scale, pooled;
++    void freeze() { k.freeze(); v.freeze(); k_scale.freeze(); v_scale.freeze(); pooled.freeze(); }
++    template<class Fn> void for_each_bytes(Fn&& fn) const {
++        for (const auto* b : {&k, &v, &k_scale, &v_scale, &pooled}) b->for_each_bytes(fn);
++    }
++    size_t metadata_bytes() const {
++        // Charge directories separately from shared payloads.
++        return k.directory_bytes() + v.directory_bytes() + k_scale.directory_bytes() +
++               v_scale.directory_bytes() + pooled.directory_bytes();
++    }
+     size_t bytes() const {
+         return k.bytes() + v.bytes() + k_scale.bytes() + v_scale.bytes() + pooled.bytes();
+     }
+@@ -69,6 +94,12 @@ struct ConversationKvReuse {
+     int64_t captured_tokens = 0, unchanged_tokens = 0;
+     // With a layer split: the later stages' own retained K/V, one per stage, same extents (empty: none)
+     std::vector<ConversationKvReuse> stages;
++    size_t metadata_bytes() const {
++        size_t n = kv.capacity() * sizeof(ConversationKv) + stages.capacity() * sizeof(ConversationKvReuse);
++        for (const auto& layer : kv) n += layer.metadata_bytes();
++        for (const auto& s : stages) n += s.metadata_bytes();
++        return n;
++    }
+     size_t bytes() const {
+         size_t n = kv.capacity() * sizeof(ConversationKv) + stages.capacity() * sizeof(ConversationKvReuse);
+         for (const auto& layer : kv) n += layer.bytes();
+@@ -173,6 +204,26 @@ struct SavedConversation {
+         return false;
+     }
+ 
++    void freeze() {
++        if (!conversation_dedup_enabled()) return;
++        live.freeze(); for (auto& c : checkpoints) c.freeze();
++        for (auto& k : kv) k.freeze();
++        for (auto& s : stage_images) s.freeze();
++    }
++    template<class Fn> void for_each_bytes(Fn&& fn) const {
++        live.for_each_bytes(fn);
++        for (const auto& c : checkpoints) c.for_each_bytes(fn);
++        for (const auto& k : kv) k.for_each_bytes(fn);
++        for (const auto& s : stage_images) s.for_each_bytes(fn);
++    }
++    size_t metadata_bytes() const {
++        size_t n = live.metadata_bytes() + checkpoints.capacity() * sizeof(ConversationCheckpoint) +
++                   kv.capacity() * sizeof(ConversationKv) + stage_images.capacity() * sizeof(SavedConversation);
++        for (const auto& c : checkpoints) n += c.metadata_bytes();
++        for (const auto& k : kv) n += k.metadata_bytes();
++        for (const auto& s : stage_images) n += s.metadata_bytes();
++        return n;
++    }
+     size_t bytes() const {
+         size_t n = live.bytes() + checkpoints.capacity() * sizeof(ConversationCheckpoint) +
+                    kv.capacity() * sizeof(ConversationKv);
+@@ -215,7 +266,22 @@ public:
+     /// with one long conversation spends the cache on the side requests and evicts the long one (oldest first) -
+     /// exactly the reuse it wanted.  0 parks every conversation, whatever its size.
+     bool wants(int64_t tokens) const { return min_tokens_ <= 0 || tokens >= min_tokens_; }
+-    size_t bytes() const { return bytes_ + reuse_.bytes(); }
++    size_t logical_bytes() const {
++        size_t n = reuse_.bytes();
++        for (const auto& e : entries_) n += e.bytes();
++        return n;
++    }
++    size_t metadata_bytes() const {
++        size_t n = reuse_.metadata_bytes() + entries_.size() * (sizeof(SavedConversation) + sizeof(uint64_t));
++        for (const auto& e : entries_) n += e.metadata_bytes();
++        // Conservative allowance for live wrappers and control blocks.
++        n += conversation_storage_stats().objects.load() * ConversationBytes::wrapper_allowance;
++        return n + ConversationBytes::index_bytes();
++    }
++    size_t bytes() const {
++        if (!conversation_dedup_enabled()) return bytes_ + reuse_.bytes();
++        return conversation_storage_stats().payload.load() + metadata_bytes();
++    }
+     size_t size() const { return entries_.size(); }
+     size_t evictions() const { return evictions_; }
+     // the longest parked conversation, in tokens (--kv-grow keeps the K/V that long while it could be restored)
+@@ -233,7 +299,10 @@ public:
+         reuse_ = {};
+         ConversationKvReuse candidate{std::move(kv), tokens, tokens, {}};
+         for (auto& k : stage_kv) candidate.stages.push_back(ConversationKvReuse{std::move(k), tokens, tokens, {}});
+-        if (enabled() && candidate.bytes() <= budget_ - bytes_) reuse_ = std::move(candidate);
++        if (conversation_dedup_enabled()) {
++            if (enabled() && bytes() <= budget_ && candidate.metadata_bytes() <= budget_ - bytes())
++                reuse_ = std::move(candidate);
++        } else if (enabled() && candidate.bytes() <= budget_ - bytes_) reuse_ = std::move(candidate);
+     }
+     void limit_reuse(int64_t first_dirty) {
+         reuse_.unchanged_tokens = std::min(reuse_.unchanged_tokens, first_dirty);
+@@ -243,6 +312,7 @@ public:
+     ConversationKvReuse take_reuse() { return std::exchange(reuse_, {}); }
+     size_t retained_bytes() const { return reuse_.bytes(); }
+     bool can_fit(size_t incoming, size_t held = 0) const {
++        if (conversation_dedup_enabled()) held = 0; // already in the payload ledger
+         return enabled() && held <= budget_ && incoming <= budget_ - held &&
+                entries_.size() < slots_ && bytes() <= budget_ - held - incoming;
+     }
+@@ -313,8 +383,8 @@ public:
+     // Reserve before allocating a snapshot. held is an incoming image removed
+     // with take() but still alive during the exchange; count it against RAM too.
+     bool make_room(size_t incoming, size_t held = 0) {
++        if (conversation_dedup_enabled()) return make_room_shared(incoming);
+         if (!enabled() || held > budget_ || incoming > budget_ - held) return false;
+-        auto stays = [&](size_t i) { return entries_[i].pinned() || (guarded_ != 0 && serials_[i] == guarded_); };
+         if (guarded_ != 0 && index_of(guarded_) != SIZE_MAX) {
+             // with everything else gone, would it fit beside the entries that stay (the guarded donor and any pinned
+             // shared prefix)?  If not, evict nothing
+@@ -341,7 +411,7 @@ public:
+     bool evict_oldest() {
+         // the oldest entry that holds no pinned shared prefix and is not the guarded (borrowed) donor
+         for (size_t i = 0; i < entries_.size(); ++i) {
+-            if (entries_[i].pinned() || (guarded_ != 0 && serials_[i] == guarded_)) continue;
++            if (stays(i)) continue;
+             bytes_ -= entries_[i].bytes();
+             erase(i);
+             ++evictions_;
+@@ -373,21 +443,10 @@ public:
+     // shares the system prompt's root with it), is kept.  Returns how many were dropped.
+     size_t drop_superseded(const std::vector<int32_t>& ids, const std::vector<ConversationImageKey>& images,
+                            const std::vector<ConversationCheckpoint>& checkpoints, bool cvec) {
+-        auto held = [&](const ConversationCheckpoint& c) {
+-            if (c.ids == ids && c.imgs == images) return true;
+-            for (const auto& k : checkpoints)
+-                if (k.ids == c.ids && k.imgs == c.imgs) return true;
+-            return false;
+-        };
+         size_t dropped = 0;
+         for (size_t i = 0; i < entries_.size();) {
+-            const auto& e = entries_[i];
+-            const ConversationCheckpoint* deepest = nullptr;
+-            for (const auto& c : e.checkpoints)
+-                if (!deepest || c.ids.size() > deepest->ids.size()) deepest = &c;
+-            if (e.cvec == cvec && deepest && !deepest->ids.empty() && held(*deepest) &&
+-                !(guarded_ != 0 && serials_[i] == guarded_)) {
+-                bytes_ -= e.bytes();
++            if (superseded_by(i, ids, images, checkpoints, cvec)) {
++                bytes_ -= entries_[i].bytes();
+                 erase(i);
+                 ++dropped;
+                 continue;
+@@ -420,6 +479,24 @@ public:
+     }
+ 
+     bool put(SavedConversation&& image, size_t held = 0) {
++        if (conversation_dedup_enabled()) {
++            image.freeze();
++            // Its payload and `held` are already charged; add only this entry's metadata.
++            const size_t meta = image.metadata_bytes() + sizeof(SavedConversation) + sizeof(uint64_t);
++            if (!enabled() || meta > budget_) return false;
++            // Superseded copies go only if the image is then admitted.
++            std::vector<bool> superseded(entries_.size());
++            for (size_t i = 0; i < entries_.size(); ++i)
++                superseded[i] = superseded_by(i, image.live.ids, image.live.imgs, image.checkpoints, image.cvec);
++            if (!make_room_shared(meta, superseded)) return false;
++            // Allocate before moving so failure preserves the caller's image.
++            serials_.push_back(next_serial_);
++            try { entries_.push_back(std::move(image)); }
++            catch (...) { serials_.pop_back(); throw; }
++            ++next_serial_;
++            bytes_ += entries_.back().bytes(); // legacy logical bookkeeping
++            return true;
++        }
+         const size_t n = image.bytes();
+         if (!enabled() || held > budget_ || n > budget_ - held) return false;   // make_room's refusal, first
+         drop_superseded(image.live.ids, image.live.imgs, image.checkpoints, image.cvec);
+@@ -431,6 +508,71 @@ public:
+     }
+ 
+ private:
++    // Pinned shared prefixes and the guarded (borrowed) donor are never evicted.
++    bool stays(size_t i) const { return entries_[i].pinned() || (guarded_ != 0 && serials_[i] == guarded_); }
++    // drop_superseded()'s rule for entry i.
++    bool superseded_by(size_t i, const std::vector<int32_t>& ids, const std::vector<ConversationImageKey>& images,
++                       const std::vector<ConversationCheckpoint>& checkpoints, bool cvec) const {
++        auto held = [&](const ConversationCheckpoint& c) {
++            if (c.ids == ids && c.imgs == images) return true;
++            for (const auto& k : checkpoints)
++                if (k.ids == c.ids && k.imgs == c.imgs) return true;
++            return false;
++        };
++        const auto& e = entries_[i];
++        const ConversationCheckpoint* deepest = nullptr;
++        for (const auto& c : e.checkpoints)
++            if (!deepest || c.ids.size() > deepest->ids.size()) deepest = &c;
++        return e.cvec == cvec && deepest && !deepest->ids.empty() && held(*deepest) &&
++               !(guarded_ != 0 && serials_[i] == guarded_);
++    }
++    // Dedup mode. `held` and retained storage are already in the payload ledger.
++    // Plan removals from what each would really release under bytes()'s rules:
++    // payload (shared blocks only with their last owner), entry metadata and
++    // wrapper/index-node allowances; retained index buckets stay charged.
++    // `replaced` entries (superseded copies) go first, then oldest first.
++    // An image that cannot fit removes nothing.
++    bool make_room_shared(size_t incoming, const std::vector<bool>& replaced = {}) {
++        if (!enabled() || incoming > budget_) return false;
++        auto fits = [&](size_t used, size_t count) { return count < slots_ && used <= budget_ - incoming; };
++        auto marked = [&](size_t i) { return i < replaced.size() && replaced[i]; };
++        std::unordered_map<const void*, long> released;
++        size_t freed = 0, count = 0, victims = 0;
++        auto release = [&](size_t i) {
++            entries_[i].for_each_bytes([&](const ConversationBytes& b) {
++                freed += ConversationBytes::wrapper_allowance;
++                if (!b.shared()) freed += b.capacity();
++                else if (++released[b.payload_id()] == b.payload_owners())
++                    freed += b.capacity() + (b.indexed() ? ConversationBytes::index_node_allowance : 0);
++            });
++            freed += entries_[i].metadata_bytes() + sizeof(SavedConversation) + sizeof(uint64_t);
++            --count;
++        };
++        auto plan_replaced = [&] {
++            released.clear(); freed = 0; count = entries_.size();
++            for (size_t i = 0; i < entries_.size(); ++i)
++                if (marked(i)) release(i);
++        };
++        plan_replaced();
++        size_t used = bytes();
++        if (used - std::min(used, freed) > budget_ - incoming) { reuse_ = {}; used = bytes(); plan_replaced(); }
++        for (size_t i = 0; i < entries_.size() && !fits(used - std::min(used, freed), count); ++i) {
++            if (stays(i) || marked(i)) continue;
++            release(i);
++            ++victims;
++        }
++        if (!fits(used - std::min(used, freed), count)) {
++            if (guarded_ != 0 && index_of(guarded_) != SIZE_MAX) guard_blocked_ = true;
++            return false;
++        }
++        for (size_t i = entries_.size(); i-- > 0;)
++            if (marked(i)) { bytes_ -= entries_[i].bytes(); erase(i); ++superseded_; }
++        while (victims-- > 0) evict_oldest();
++        // Safety net for allocator-dependent metadata; the plan should already fit.
++        while (!fits(bytes(), entries_.size()))
++            if (!evict_oldest()) return false;
++        return true;
++    }
+     void erase(size_t index) {
+         entries_.erase(entries_.begin() + (std::ptrdiff_t) index);
+         serials_.erase(serials_.begin() + (std::ptrdiff_t) index);
+diff --git c/include/strata/core/conversation_snapshot.hpp w/include/strata/core/conversation_snapshot.hpp
+index dcee29f..cbd3b7b 100644
+--- c/include/strata/core/conversation_snapshot.hpp
++++ w/include/strata/core/conversation_snapshot.hpp
+@@ -18,8 +18,10 @@ size_t conversation_kv_bytes(const QsaState& state, const ModelGeometry& g, int6
+ bool conversation_kv_save(ConversationKv& image, const QsaState& state, const ModelGeometry& g,
+                           int64_t upto, bool include_index, std::string& error,
+                           int64_t unchanged_tokens = 0, size_t* reused_bytes = nullptr);
++// unchanged_tokens: the retained prefix the capture keeps (dedup mode counts only what it adds).
+ bool conversation_kv_capture_bytes(const ConversationKv& image, const QsaState& state, const ModelGeometry& g,
+-                                   int64_t upto, bool include_index, size_t& bytes, std::string& error);
++                                   int64_t upto, bool include_index, size_t& bytes, std::string& error,
++                                   int64_t unchanged_tokens = 0);
+ // No CUDA calls or destination writes. Used for whole-session prevalidation.
+ bool conversation_kv_validate(const ConversationKv& image, const QsaState& state, const ModelGeometry& g,
+                               int64_t upto, bool include_index, std::string& error);
+@@ -90,7 +92,9 @@ bool conversation_snapshot_capture_bytes(const ConversationKvReuse& reuse, const
+                                          const SessionState& session, const ModelGeometry& g,
+                                          const QsaState& draft, size_t& bytes, std::string& error);
+ // The capture estimate includes retained capacity and transient segment directories;
+-// only estimate - reuse.bytes() requires additional physical RAM. Capture consumes
++// only estimate - reuse.bytes() requires additional physical RAM. With
++// STRATA_PARKED_DEDUP=1 retained and shared storage is already charged, so the
++// estimate is the additional storage itself. Capture consumes
+ // the uniquely owned reusable buffers, including on failure.
+ // Caller admits the estimate before invoking capture. Allocation failures propagate
+ // to the RAM policy; the active session is never modified by capture.
+diff --git c/include/strata/core/session_save_reclaim.hpp w/include/strata/core/session_save_reclaim.hpp
+index da2e26c..98012ee 100644
+--- c/include/strata/core/session_save_reclaim.hpp
++++ w/include/strata/core/session_save_reclaim.hpp
+@@ -27,6 +27,7 @@ SessionSaveReclaimed session_save_reclaim(std::vector<ConversationCheckpoint>& c
+     if (cache.retained_bytes()) {
+         out.bytes += cache.retained_bytes();
+         { auto unused = cache.take_reuse(); }
++        conversation_release_free_heap();
+         room = available();
+         if (done()) return out;
+     }
+@@ -35,6 +36,7 @@ SessionSaveReclaimed session_save_reclaim(std::vector<ConversationCheckpoint>& c
+         if (!cache.evict_oldest()) break; // pinned conversations stay parked
+         ++out.parked;
+         out.bytes += before - cache.bytes();
++        conversation_release_free_heap();
+         room = available();
+         if (done()) return out;
+     }
+diff --git c/serve/server.py w/serve/server.py
+index 6e34df2..0c2a6b1 100644
+--- c/serve/server.py
++++ w/serve/server.py
+@@ -793,6 +793,10 @@ class ConvCacheLog:
+         for line in data[:end].decode("utf-8", "replace").splitlines():
+             if "conversation cache:" not in line:
+                 continue
++            if "conversation cache: dedup mode=" in line:
++                values = {k: int(v) for k, v in re.findall(r"(\w+)=(\d+)", line)}
++                self.state["dedup"] = {**self.state.get("dedup", {}), **values}
++                continue
+             m = self.EVENT.search(line)
+             if m:
+                 st = self.state
+diff --git c/src/core/conversation_copy.hpp w/src/core/conversation_copy.hpp
+index 7e8341b..3ead3ea 100644
+--- c/src/core/conversation_copy.hpp
++++ w/src/core/conversation_copy.hpp
+@@ -74,6 +74,18 @@ inline std::vector<T> copy_beating(const std::vector<T>& src) {
+     return out;
+ }
+ 
++inline ConversationBytes copy_beating(const ConversationBytes& src) {
++    if (conversation_dedup_enabled()) return src;
++    std::vector<uint8_t> out;
++    out.reserve(src.size());
++    for (size_t at = 0; at < src.size(); at += 1 << 20) {
++        out.insert(out.end(), src.begin() + at, src.begin() + std::min(src.size(), at + (1 << 20)));
++        if (const long us = test_slow_copy_us(); us > 0) std::this_thread::sleep_for(std::chrono::microseconds(us));
++        core::progress_beat();
++    }
++    ConversationBytes result; result = std::move(out); return result;
++}
++
+ inline ConversationCheckpoint copy_checkpoint_beating(const ConversationCheckpoint& c) {
+     ConversationCheckpoint o;
+     o.ids = copy_beating(c.ids);
+diff --git c/src/core/conversation_file.cpp w/src/core/conversation_file.cpp
+index 0b1d023..c978fb3 100644
+--- c/src/core/conversation_file.cpp
++++ w/src/core/conversation_file.cpp
+@@ -643,7 +643,7 @@ struct Out {
+     }
+     void u64(uint64_t v) { raw(&v, 8); }
+     void i64(int64_t v) { raw(&v, 8); }
+-    template<class T> void vec(const std::vector<T>& v) { u64(v.size()); raw(v.data(), v.size() * sizeof(T)); }
++    template<class V> void vec(const V& v) { u64(v.size()); raw(v.data(), v.size() * sizeof(typename V::value_type)); }
+     void buffer(const ConversationBuffer& b) {
+         u64(b.size());
+         b.visit(0, b.size(), [&](const uint8_t* p, size_t c, size_t) { raw(p, c); return ok; });
+@@ -735,7 +735,8 @@ struct In {
+         if (n > (uint64_t) std::numeric_limits<size_t>::max() / (elem ? elem : 1)) return fail("element count too large");
+         return true;
+     }
+-    template<class T> bool vec(std::vector<T>& v, uint64_t limit = UINT64_MAX) {
++    template<class V> bool vec(V& v, uint64_t limit = UINT64_MAX) {
++        using T = typename V::value_type;
+         uint64_t n = 0;
+         if (!count(n, sizeof(T), limit)) return false;
+         v.resize((size_t) n);
+diff --git c/src/core/conversation_snapshot.cpp w/src/core/conversation_snapshot.cpp
+index 76e69b5..ea9672c 100644
+--- c/src/core/conversation_snapshot.cpp
++++ w/src/core/conversation_snapshot.cpp
+@@ -121,15 +121,27 @@ bool transfer(void* dst, const void* src, size_t n, std::string& error) {
+ }
+ } // namespace
+ 
++namespace {
++// Recopy the partial page and the indexer's moving spare row. Completed
++// pages/rows strictly before the first rewritten token remain identical.
++size_t retained_prefix(const Layout& l, const ModelGeometry& g, size_t part, size_t size, int64_t unchanged, bool index) {
++    if (part == 4) return index ? size_t(unchanged / strata::kernels::qsa_real_shapes().idx_block) * g.idx_key_dim * 4 : 0;
++    const int64_t whole_cells = (unchanged / l.page_size) * l.page_size;
++    return l.cells ? (size / size_t(l.cells)) * size_t(whole_cells) : 0;
++}
++} // namespace
++
+ bool conversation_kv_capture_bytes(const ConversationKv& image, const QsaState& st, const ModelGeometry& g,
+-                                   int64_t upto, bool index, size_t& bytes, std::string& error) {
++                                   int64_t upto, bool index, size_t& bytes, std::string& error,
++                                   int64_t unchanged_tokens) {
+     Layout l{};
+     if (!layout(st, g, upto, index, l, error) || !valid(st, l, upto, error)) return false;
+     const std::array<size_t,5> sizes = {l.data, l.value_data, l.scales, l.value_scales, l.pooled};
+     const std::array<const ConversationBuffer*,5> buffers = {&image.k, &image.v, &image.k_scale, &image.v_scale, &image.pooled};
+     bytes = 0;
+     for (size_t i = 0; i < buffers.size(); ++i) {
+-        const size_t n = buffers[i]->allocation_peak(sizes[i]);
++        const size_t keep = unchanged_tokens > 0 ? retained_prefix(l, g, i, sizes[i], unchanged_tokens, index) : 0;
++        const size_t n = buffers[i]->allocation_peak(sizes[i], keep);
+         if (n == SIZE_MAX || !conversation_detail::add(bytes, n)) {
+             error = "conversation snapshot: segmented K/V allocation overflow";
+             return false;
+@@ -154,7 +166,6 @@ bool conversation_kv_save(ConversationKv& image, const QsaState& st, const Model
+         error = "conversation snapshot: invalid unchanged prefix";
+         return false;
+     }
+-    const int64_t whole_cells = (unchanged_tokens / l.page_size) * l.page_size;
+     image.format = l.format;
+     image.cells = l.cells;
+     image.heads = g.n_head_kv;
+@@ -166,15 +177,13 @@ bool conversation_kv_save(ConversationKv& image, const QsaState& st, const Model
+     const std::array<size_t,5> sizes = {l.data, l.value_data, l.scales, l.value_scales, l.pooled};
+     const std::array<ConversationBuffer*,5> dst = {&image.k, &image.v, &image.k_scale, &image.v_scale, &image.pooled};
+     for (size_t i = 0; i < dst.size(); ++i) {
+-        // Recopy the partial page and the indexer's moving spare row. Completed
+-        // pages/rows strictly before the first rewritten token remain identical.
+-        const size_t keep = i == 4 ? (index ? size_t(unchanged_tokens / strata::kernels::qsa_real_shapes().idx_block) * g.idx_key_dim * 4 : 0)
+-                                  : l.cells ? (sizes[i] / size_t(l.cells)) * size_t(whole_cells) : 0;
++        const size_t keep = retained_prefix(l, g, i, sizes[i], unchanged_tokens, index);
+         if (keep > dst[i]->size()) { error = "conversation snapshot: missing reusable prefix"; return false; }
+         dst[i]->resize(sizes[i]);
+         if (!dst[i]->visit(keep, sizes[i] - keep, [&](uint8_t* p, size_t n, size_t at) {
+                 return transfer(p, src[i] ? static_cast<const uint8_t*>(src[i]) + at : nullptr, n, error);
+             })) return false;
++        dst[i]->freeze();
+         if (reused_bytes) *reused_bytes += keep;
+     }
+     return true;
+diff --git c/src/core/conversation_snapshot_test.cpp w/src/core/conversation_snapshot_test.cpp
+index 074a3ae..1641b13 100644
+--- c/src/core/conversation_snapshot_test.cpp
++++ w/src/core/conversation_snapshot_test.cpp
+@@ -227,8 +227,9 @@ void full_session(int fmt, int mode, int experts) {
+     for (int64_t dirty : {65, 3, 0}) {
+         check(conversation_snapshot_restore(a,ss,g,draft.state,err)==ConversationRestore::restored,"restore growth fixture base");
+         ConversationKvReuse reuse{a.kv,65,dirty};
++        const auto donor_before = a.kv[0].k;
+         const uint8_t* original = nullptr;
+-        reuse.kv[0].k.visit(0,1,[&](const uint8_t* p,size_t,size_t){original=p;return true;});
++        std::as_const(reuse.kv[0].k).visit(0,1,[&](const uint8_t* p,size_t,size_t){original=p;return true;});
+         main.fill_after(91,dirty); draft.fill_after(91,std::max<int64_t>(0,dirty-1));
+         cuda_check(cudaMemset(ss.gdn_state,91,sizes.gdn));
+         ids.resize(70);
+@@ -239,15 +240,22 @@ void full_session(int fmt, int mode, int experts) {
+         check(conversation_snapshot_save(fresh,view,ss,g,draft.state,err),"full capture reference after growth or rewind");
+         size_t peak=0,reused=0;
+         check(conversation_snapshot_capture_bytes(reuse,view,ss,g,draft.state,peak,err),"admit incremental capture peak");
++        const size_t ledger = conversation_storage_stats().reset_peak();
+         check(conversation_snapshot_save(incremental,view,ss,g,draft.state,err,std::move(reuse),&reused),"capture with retained pages");
+-        check(incremental.bytes() <= peak,"incremental allocation stays within admitted bound");
++        check(conversation_dedup_enabled() ? conversation_storage_stats().added_within(ledger,peak) : incremental.bytes() <= peak,
++              "incremental allocation stays within admitted bound");
+         check(incremental.live.gdn==fresh.live.gdn && incremental.live.ple==fresh.live.ple &&
+               incremental.live.dead==fresh.live.dead && equal(incremental.kv[0],fresh.kv[0]) &&
+               equal(incremental.kv[1],fresh.kv[1]),"incremental capture equals full capture after growth or rewind");
+         check((dirty>=4)==(reused>0),"only complete unchanged pages or rows are retained");
+-        incremental.kv[0].k.visit(0,1,[&](const uint8_t* p,size_t,size_t){
+-            check(p==original,"growth never reallocates the retained payload");return true;
+-        });
++        if (!conversation_dedup_enabled()) {
++            std::as_const(incremental.kv[0].k).visit(0,1,[&](const uint8_t* p,size_t,size_t){
++                check(p==original,"growth never reallocates the retained payload");return true;
++            });
++        } else {
++            // Partial immutable blocks may detach; the donor must stay unchanged.
++            check(a.kv[0].k==donor_before,"incremental capture preserves immutable donor bytes");
++        }
+         check(conversation_snapshot_restore(incremental,ss,g,draft.state,err)==ConversationRestore::restored,"restore segmented incremental snapshot");
+         uint64_t fingerprint=0;
+         check(conversation_kv_verify(incremental.kv.back(),draft.state,g,70,false,fingerprint,err),"incremental draft authoritative and ring read-back");
+@@ -283,8 +291,11 @@ void full_session(int fmt, int mode, int experts) {
+         size_t peak=0,reused=0;
+         check(conversation_snapshot_save(fresh,view,ss,g,nullptr,err),"full stage capture reference");
+         check(conversation_snapshot_capture_bytes(reuse,view,ss,g,nullptr,peak,err),"admit an incremental stage capture");
++        const size_t ledger = conversation_storage_stats().reset_peak();
+         check(conversation_snapshot_save(incremental,view,ss,g,nullptr,err,std::move(reuse),&reused),"incremental stage capture");
+-        check(reused>0 && incremental.bytes()<=peak && equal(incremental.kv[0],fresh.kv[0]) &&
++        const bool within = conversation_dedup_enabled() ? conversation_storage_stats().added_within(ledger,peak)
++                                                         : incremental.bytes()<=peak;
++        check(reused>0 && within && equal(incremental.kv[0],fresh.kv[0]) &&
+               incremental.live.gdn==fresh.live.gdn,"an incremental stage capture reuses pages and equals a full one");
+         SavedConversation split_image=stage;
+         split_image.stage_images.push_back(stage);
+diff --git c/src/core/conversation_state.cpp w/src/core/conversation_state.cpp
+index c64e09d..1c6304e 100644
+--- c/src/core/conversation_state.cpp
++++ w/src/core/conversation_state.cpp
+@@ -98,7 +98,9 @@ bool metadata_bytes(const ConversationCheckpoint& c, size_t& total) {
+     size_t ids = 0, images = 0;
+     if (!product(ids, {c.ids.size(), sizeof(int32_t)}) ||
+         !product(images, {c.imgs.size(), sizeof(ConversationImageKey)})) return false;
+-    for (size_t n : {ids, images, c.gdn.size(), c.ple.size(), c.tails.size(), c.dead.size(), c.block_pos.size()})
++    // A frozen payload is copied by reference in dedup mode.
++    auto copied = [](const ConversationBytes& b) { return conversation_dedup_enabled() && b.shared() ? 0 : b.size(); };
++    for (size_t n : {ids, images, copied(c.gdn), copied(c.ple), copied(c.tails), copied(c.dead), copied(c.block_pos)})
+         if (!add(total, n)) return false;
+     return true;
+ }
+@@ -181,6 +183,7 @@ bool conversation_checkpoint_save(ConversationCheckpoint& c, const SessionState&
+             !copy(c.dead.data() + j * z.dead, st.idx_dead, z.dead, error) ||
+             !copy(c.block_pos.data() + j * z.block_pos, st.idx_block_pos, z.block_pos, error)) return false;
+     }
++    c.freeze();
+     return true;
+ }
+ 
+@@ -288,7 +291,10 @@ bool conversation_snapshot_capture_bytes(const ConversationKvReuse& reuse, const
+         if (!conversation_kv_validate(reuse.kv[i], st, g, reuse.captured_tokens, index, error)) return false;
+         const size_t fresh = conversation_kv_bytes(st, g, int64_t(view.ids.size()), index);
+         size_t retained = 0;
+-        if (!conversation_kv_capture_bytes(reuse.kv[i], st, g, int64_t(view.ids.size()), index, retained, error)) return false;
++        // The same retained prefixes conversation_snapshot_save keeps.
++        const int64_t unchanged = index ? reuse.unchanged_tokens : std::max<int64_t>(0, reuse.unchanged_tokens - 1);
++        if (!conversation_kv_capture_bytes(reuse.kv[i], st, g, int64_t(view.ids.size()), index, retained, error,
++                                           unchanged)) return false;
+         bytes -= fresh;
+         if (!add(bytes, retained)) return fail(error, "retained K/V allocation overflow");
+     }
+diff --git c/src/core/conversation_validation_test.cpp w/src/core/conversation_validation_test.cpp
+index c670ef1..351586f 100644
+--- c/src/core/conversation_validation_test.cpp
++++ w/src/core/conversation_validation_test.cpp
+@@ -219,11 +219,14 @@ void fixture(int format, int experts, bool zero_qsa, bool ple) {
+     size_t peak = 0, reused = 0;
+     check(conversation_snapshot_capture_bytes(reuse,view,ss,g,draft.st,peak,error), "incremental capture admission without transfers");
+     copied_bytes = 0;
++    const size_t ledger = conversation_storage_stats().reset_peak();
+     const bool saved_incrementally = conversation_snapshot_save(incremental,view,ss,g,draft.st,error,std::move(reuse),&reused);
+     if (!saved_incrementally) std::fprintf(stderr,"capture error: %s\n",error.c_str());
+     check(saved_incrementally, "incremental capture through host backend");
+     check(reused > 0 && copied_bytes + reused == full_copies, "reused byte count measures transfers actually omitted");
+-    check(incremental.bytes() <= peak && incremental.live.gdn == full.live.gdn, "running state refreshed within admitted allocation");
++    const bool within = conversation_dedup_enabled() ? conversation_storage_stats().added_within(ledger,peak)
++                                                     : incremental.bytes() <= peak;
++    check(within && incremental.live.gdn == full.live.gdn, "running state refreshed within admitted allocation");
+     for (size_t i=0;i<full.kv.size();++i)
+         check(incremental.kv[i].k==full.kv[i].k && incremental.kv[i].v==full.kv[i].v &&
+               incremental.kv[i].k_scale==full.kv[i].k_scale && incremental.kv[i].v_scale==full.kv[i].v_scale &&
+diff --git c/src/program/generate.cpp w/src/program/generate.cpp
+index 4ae51e4..7dbf1e3 100644
+--- c/src/program/generate.cpp
++++ w/src/program/generate.cpp
+@@ -9489,9 +9489,27 @@ int main(int argc, char** argv) {
+                 o.conversation_cache_mib = 0;
+             }
+         }
++        if (strata::core::conversation_dedup_enabled() && (!stages.empty() || o.batch != 0)) {
++            std::fprintf(stderr, "strata: STRATA_PARKED_DEDUP requires single-GPU serial serving\n");
++            return 1;
++        }
++        std::fprintf(stderr, "strata serve: conversation cache: dedup mode=%d (STRATA_PARKED_DEDUP; restart required)\n",
++                     strata::core::conversation_dedup_enabled() ? 1 : 0);
+         strata::core::ConversationCache conversations(
+             o.prompt_cache > 0 ? (size_t) o.conversation_cache_mib * 1024 * 1024 : 0,
+             (size_t) o.conversation_cache_slots, o.conversation_cache_min_tokens);
++        auto dedup_diagnostics = [&] {
++            if (!strata::core::conversation_dedup_enabled()) return;
++            const auto& st = strata::core::conversation_storage_stats();
++            const size_t logical = st.logical.load(), physical = st.payload.load();
++            const size_t metadata = conversations.metadata_bytes();
++            std::fprintf(stderr, "strata serve: conversation cache: dedup mode=1 logical_bytes=%zu physical_bytes=%zu "
++                         "saved_bytes=%zu metadata_bound=%zu accounted_bytes=%zu allocation_peak=%zu hits=%zu cow=%zu "
++                         "index_entries=%zu\n",
++                         logical, physical, logical > physical ? logical - physical : 0,
++                         metadata, physical + metadata, st.peak.load(), st.hits.load(), st.cow.load(),
++                         strata::core::ConversationBytes::index_entries());
++        };
+         // Disk sessions: what a session file is bound to.  The model fingerprint samples every model input this
+         // engine loaded, by role (conversation_file.hpp), once; the config fingerprint covers the RESOLVED settings
+         // that change what the saved bytes mean - the rope (K is cached post-RoPE), the loaded control vector, the
+@@ -9658,6 +9676,8 @@ int main(int argc, char** argv) {
+             // estimate must stay uncapped: it counts the retained buffers'
+             // capacity and directories, and put() charges that same true size -
+             // a capped figure would under-evict and overfill the budget.
++            // Dedup mode: retained and held storage are already charged, the
++            // estimate counts only what the capture adds and `held` is ignored.
+             if (!conversations.make_room(estimate, held)) {
+                 std::fprintf(stderr, "strata serve: conversation cache: skip parking (snapshot %zu MiB exceeds available budget)\n",
+                              estimate >> 20);
+@@ -9667,7 +9687,9 @@ int main(int argc, char** argv) {
+             try {
+                 const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib * 1024 * 1024;
+                 const size_t retained = reuse.bytes() + stage_retained;
+-                const size_t additional = estimate > retained ? estimate - retained : 0;
++                // Dedup mode: retained storage is already resident and the estimate is the addition.
++                const size_t additional = strata::core::conversation_dedup_enabled() ? estimate
++                                        : estimate > retained ? estimate - retained : 0;
+                 // The physical-RAM gate: the incoming snapshot has to fit beside the floor.  make_room()
+                 // above only balanced the cache's own budget, so a full cache leaves this one short even
+                 // though every parked conversation could give its RAM back - and refusing here throws
+@@ -9685,9 +9707,14 @@ int main(int argc, char** argv) {
+                     return strata::core::conversation_memory_admit(
+                         mem ? std::optional<uint64_t>(mem->available) : std::nullopt, additional, floor);
+                 };
++                // Dedup mode: make_room() may have freed blocks the heap still holds; trim before evicting.
++                if (strata::core::conversation_dedup_enabled() && !admit())
++                    strata::core::conversation_release_free_heap();
+                 while (!admit() && conversations.size() > 0 && evicted < conversations.slots() &&
+-                       conversations.evict_oldest())
++                       conversations.evict_oldest()) {
+                     ++evicted;
++                    strata::core::conversation_release_free_heap();   // dedup blocks: see the helper
++                }
+                 if (!admit()) {
+                     std::fprintf(stderr, "strata serve: conversation cache: skip parking (physical RAM admission; need %zu MiB plus %lld MiB floor, %s; evicted %zu, %zu still parked)\n",
+                                  additional >> 20, (long long) o.conversation_cache_min_free_mib, ram_note(mem).c_str(),
+@@ -9726,6 +9753,7 @@ int main(int argc, char** argv) {
+                              stored ? "parked" : "skipped", live.size(),
+                              std::chrono::duration<double, std::milli>(Clock::now() - t0).count(),
+                              conversations.size(), conversations.bytes(), conversations.evictions(), snapshot_bytes, reused_bytes);
++                dedup_diagnostics();
+             } catch (const std::bad_alloc&) {
+                 // The active state has not been touched. Continue with normal
+                 // prompt processing rather than killing a serving process.
+@@ -13066,6 +13094,12 @@ int main(int argc, char** argv) {
+                     if ((int64_t) c.ids.size() <= parked.tokens && starts_with(c.ids, c.imgs)) checks.push_back(c);
+                 for (const ConvCheckpoint& c : checks)
+                     if ((int64_t) c.ids.size() == parked.tokens) { live = c.ids; live_imgs = c.imgs; }
++                if (strata::core::conversation_dedup_enabled() && std::getenv("STRATA_SNAPSHOT_FULL_CAPTURE") == nullptr) {
++                    // Reuse the restored donor, preserving its dirty boundary.
++                    conversations.retain(std::vector<strata::core::ConversationKv>(donor->kv),
++                                         int64_t(donor->live.ids.size()));
++                    conversations.limit_reuse(parked.tokens);
++                }
+                 cvec_cached = donor->cvec;
+                 resume = parked.tokens;
+                 from_live = false;
+@@ -15670,6 +15704,7 @@ int main(int argc, char** argv) {
+             if (o.lookup_chain > 0)
+                 std::snprintf(chain_txt, sizeof(chain_txt), " %lld %lld %lld %lld %lld", (long long) chain_ok,
+                               (long long) chain_drafts, (long long) sfx_ok, (long long) sfx_drafts, (long long) dec_windows);
++            dedup_diagnostics();
+             if (yielded_at >= 0) std::printf("YIELDED %d %lld\n", yielded_slot, (long long) yielded_at);
+             std::printf("DONE %lld %lld %.1f %.1f %s %lld %lld %lld %lld %lld %lld %lld %.1f %lld %lld%s chunk=%lld "
+                         "experts_streamed=%lld\n",

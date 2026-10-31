@@ -1,0 +1,311 @@
+[
+  {
+    "campaign": "pi-fx-strata-20261030",
+    "artifacts": [
+      "reports/pi-fx-strata-20261030--README.md",
+      "measurements/pi-fx-strata-20261030--summary.json"
+    ]
+  },
+  {
+    "campaign": "rtx2080-prefill-20261018",
+    "artifacts": [
+      "patches/rtx2080-prefill-20261018--custom-turing.patch",
+      "reports/rtx2080-prefill-20261018--README.md",
+      "reports/rtx2080-prefill-20261018--summary.txt",
+      "measurements/rtx2080-prefill-20261018--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-0145-agbench-20261018",
+    "artifacts": [
+      "reports/strata-0145-agbench-20261018--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-020-beta-20261019",
+    "artifacts": [
+      "reports/strata-020-beta-20261019--README.md",
+      "measurements/strata-020-beta-20261019--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-021-20261020",
+    "artifacts": [
+      "patches/strata-021-20261020--runtime.patch",
+      "reports/strata-021-20261020--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-022-default-20261022",
+    "artifacts": [
+      "patches/strata-022-default-20261022--rebased.patch"
+    ]
+  },
+  {
+    "campaign": "strata-023-default-20261023",
+    "artifacts": [
+      "patches/strata-023-default-20261023--rebased.patch"
+    ]
+  },
+  {
+    "campaign": "strata-0242-build-20261024",
+    "artifacts": [
+      "patches/strata-0242-build-20261024--local-023.patch",
+      "patches/strata-0242-build-20261024--applied.patch"
+    ]
+  },
+  {
+    "campaign": "strata-027-default-20261028",
+    "artifacts": [
+      "reports/strata-027-default-20261028--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-027-routing-20261027",
+    "artifacts": [
+      "patches/strata-027-routing-20261027--local-source.patch",
+      "patches/strata-027-routing-20261027--ported-custom.patch",
+      "measurements/strata-027-routing-20261027--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-028-upgrade-20261030",
+    "artifacts": [
+      "patches/strata-028-upgrade-20261030--local-tuning.patch",
+      "measurements/strata-028-upgrade-20261030--summary.json",
+      "reports/strata-028-upgrade-20261030--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-029-loop-fix-20261031",
+    "artifacts": [
+      "patches/strata-029-loop-fix-20261031--loop-close.patch",
+      "reports/strata-029-loop-fix-20261031--README.md",
+      "measurements/strata-029-loop-fix-20261031--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-claudecode-agbench-20261022",
+    "artifacts": [
+      "reports/strata-claudecode-agbench-20261022--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-codex-agbench-20261022",
+    "artifacts": [
+      "reports/strata-codex-agbench-20261022--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-combined-agbench-20261021-r1",
+    "artifacts": [
+      "reports/strata-combined-agbench-20261021-r1--README.md",
+      "measurements/strata-combined-agbench-20261021-r1--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-compute-20261026",
+    "artifacts": [
+      "patches/strata-compute-20261026--sm75-iq-fusion.patch",
+      "patches/strata-compute-20261026--native-compute.patch",
+      "reports/strata-compute-20261026--summary.txt",
+      "measurements/strata-compute-20261026--summary.json",
+      "patches/strata-compute-20261026--rejected-shared-q8-reuse.patch",
+      "reports/strata-compute-20261026--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-conversation-cache-20261020",
+    "artifacts": [
+      "reports/strata-conversation-cache-20261020--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-correctness-20261023",
+    "artifacts": [
+      "reports/strata-correctness-20261023--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-dflash2-20261020",
+    "artifacts": [
+      "patches/strata-dflash2-20261020--turing.patch",
+      "measurements/strata-dflash2-20261020--summary.json",
+      "reports/strata-dflash2-20261020--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-dflash2-official-q4km-20261020",
+    "artifacts": [
+      "patches/strata-dflash2-official-q4km-20261020--prior-turing.patch",
+      "patches/strata-dflash2-official-q4km-20261020--runtime-and-turing.patch",
+      "reports/strata-dflash2-official-q4km-20261020--README.md",
+      "measurements/strata-dflash2-official-q4km-20261020--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-iq1-prefill-20261029",
+    "artifacts": [
+      "patches/strata-iq1-prefill-20261029--iq1-prefill.patch",
+      "reports/strata-iq1-prefill-20261029--README.md",
+      "measurements/strata-iq1-prefill-20261029--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-iq3s-20261022",
+    "artifacts": [
+      "reports/strata-iq3s-20261022--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-loans-default-20261021",
+    "artifacts": [
+      "reports/strata-loans-default-20261021--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-loop-compaction-20261021",
+    "artifacts": [
+      "reports/strata-loop-compaction-20261021--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-loop-harnesses-20261022",
+    "artifacts": [
+      "reports/strata-loop-harnesses-20261022--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-loop-replay-20261021",
+    "artifacts": [
+      "reports/strata-loop-replay-20261021--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-metrics-recheck-20261027",
+    "artifacts": [
+      "reports/strata-metrics-recheck-20261027--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-optimization-ab-20261021",
+    "artifacts": [
+      "patches/strata-optimization-ab-20261021--pr3281.patch",
+      "patches/strata-optimization-ab-20261021--pr2964.patch",
+      "patches/strata-optimization-ab-20261021--pr3307.patch",
+      "patches/strata-optimization-ab-20261021--turing.patch",
+      "measurements/strata-optimization-ab-20261021--summary.json",
+      "reports/strata-optimization-ab-20261021--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-overnight-20261026",
+    "artifacts": [
+      "reports/strata-overnight-20261026--IDEAS.md",
+      "patches/strata-overnight-20261026--checkpoint-chain.patch",
+      "measurements/strata-overnight-20261026--summary.json",
+      "reports/strata-overnight-20261026--README.md",
+      "patches/strata-overnight-20261026--native-speedups.patch",
+      "reports/strata-overnight-20261026--summary.txt"
+    ]
+  },
+  {
+    "campaign": "strata-paged-cache-20261029",
+    "artifacts": [
+      "patches/strata-paged-cache-20261029--production-base.patch",
+      "patches/strata-paged-cache-20261029--cache.patch",
+      "reports/strata-paged-cache-20261029--README.md",
+      "measurements/strata-paged-cache-20261029--summary.json",
+      "measurements/strata-paged-cache-20261029--final-metrics.json",
+      "reports/strata-paged-cache-20261029--completion-report.md"
+    ]
+  },
+  {
+    "campaign": "strata-pr-campaign-20261027",
+    "artifacts": [
+      "patches/strata-pr-campaign-20261027--pr4040.patch",
+      "patches/strata-pr-campaign-20261027--local-source.patch",
+      "patches/strata-pr-campaign-20261027--adapted4040.patch",
+      "patches/strata-pr-campaign-20261027--pr1536.patch",
+      "patches/strata-pr-campaign-20261027--pr3971.patch",
+      "patches/strata-pr-campaign-20261027--adapted-reuse.patch",
+      "measurements/strata-pr-campaign-20261027--summary.json",
+      "reports/strata-pr-campaign-20261027--README.md",
+      "patches/strata-pr-campaign-20261027--scratch-source.patch",
+      "patches/strata-pr-campaign-20261027--park-source.patch",
+      "patches/strata-pr-campaign-20261027--dedup-source.patch",
+      "patches/strata-pr-campaign-20261027--grammar-source.patch"
+    ]
+  },
+  {
+    "campaign": "strata-pr3277-ab-20261026",
+    "artifacts": [
+      "patches/strata-pr3277-ab-20261026--pr3277.patch",
+      "patches/strata-pr3277-ab-20261026--local-source.patch",
+      "measurements/strata-pr3277-ab-20261026--summary.json",
+      "reports/strata-pr3277-ab-20261026--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-pr3277-stock-ab-20261026",
+    "artifacts": [
+      "patches/strata-pr3277-stock-ab-20261026--pr3277.patch",
+      "measurements/strata-pr3277-stock-ab-20261026--summary.json",
+      "reports/strata-pr3277-stock-ab-20261026--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-prefill-final-20261021",
+    "artifacts": [
+      "measurements/strata-prefill-final-20261021--summary.json",
+      "reports/strata-prefill-final-20261021--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-production-ab-20261026",
+    "artifacts": [
+      "measurements/strata-production-ab-20261026--summary.json",
+      "reports/strata-production-ab-20261026--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-quant-behavior-20261023",
+    "artifacts": [
+      "reports/strata-quant-behavior-20261023--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-swift-dflash-borrowing-20261023",
+    "artifacts": [
+      "measurements/strata-swift-dflash-borrowing-20261023--summary.json"
+    ]
+  },
+  {
+    "campaign": "strata-swift15-iq2xs-20261022",
+    "artifacts": [
+      "reports/strata-swift15-iq2xs-20261022--README.md"
+    ]
+  },
+  {
+    "campaign": "strata-vision-enable-20261021",
+    "artifacts": [
+      "reports/strata-vision-enable-20261021--README.md"
+    ]
+  },
+  {
+    "campaign": "swift-engine-ab-20261025",
+    "artifacts": [
+      "patches/swift-engine-ab-20261025--turing.patch",
+      "measurements/swift-engine-ab-20261025--summary.json",
+      "reports/swift-engine-ab-20261025--README.md"
+    ]
+  },
+  {
+    "campaign": "swift-five-20261025",
+    "artifacts": [
+      "reports/swift-five-20261025--README.md",
+      "measurements/swift-five-20261025--summary.json",
+      "reports/swift-five-20261025--summary.txt"
+    ]
+  }
+]

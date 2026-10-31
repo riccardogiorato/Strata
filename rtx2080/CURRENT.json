@@ -1,0 +1,17 @@
+{
+  "production_branch": "rtx2080",
+  "profile": "rtx2080/profile.json",
+  "upstream_version": "0.2.9",
+  "engine_version": "0.1.55",
+  "upstream_commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab",
+  "tested_engine_source_commit": "0fded4a0a319cea9a4036adb4c50bbfe456fc159",
+  "tested_engine_sha256": "5099a697eb34ab1f5b4a9c81b738f96ef92e9c84c25f90ac1b742a7a61c8e719",
+  "vision_helper_sha256": "396dc65280593ab83960f369a5bdeb91851f00bfb375d56e5194642d7909bd14",
+  "hardware": "RTX 2080 8GB / SM75 / 165W / 64GB RAM",
+  "model": "Swift 1.5 Qwen3.8 Flash-Next GSQ-RCO IQ2_XS 125B",
+  "experimental_branches": [
+    "experiment/persistent-prefix-cache",
+    "experiment/iq1m-fused-prefill"
+  ],
+  "benchmark_date": "2026-10-31"
+}

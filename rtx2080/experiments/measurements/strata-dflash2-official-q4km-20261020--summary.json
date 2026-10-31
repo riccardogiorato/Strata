@@ -1,0 +1,665 @@
+{
+  "groups": [
+    {
+      "phase": "fit32",
+      "arm": "mtp",
+      "case": "short0",
+      "n": 2,
+      "prompt_n": [
+        36,
+        36
+      ],
+      "prompt_per_second": [
+        60.6,
+        66.3
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        43.8,
+        50.6
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        120,
+        121
+      ],
+      "draft_n_accepted": [
+        95,
+        101
+      ],
+      "wall_s": [
+        4.338257794999663,
+        4.985732945000564
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "mtp",
+      "case": "short1",
+      "n": 2,
+      "prompt_n": [
+        36,
+        36
+      ],
+      "prompt_per_second": [
+        50.3,
+        54.9
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        61.6,
+        62.2
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        144,
+        147
+      ],
+      "draft_n_accepted": [
+        136,
+        136
+      ],
+      "wall_s": [
+        3.7747621899998194,
+        3.806038573000478
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "mtp",
+      "case": "short2",
+      "n": 2,
+      "prompt_n": [
+        37,
+        37
+      ],
+      "prompt_per_second": [
+        55.5,
+        59.1
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        51.3,
+        53.0
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        141,
+        143
+      ],
+      "draft_n_accepted": [
+        98,
+        105
+      ],
+      "wall_s": [
+        4.296022885999264,
+        4.371035168000162
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "mtp",
+      "case": "code-25k",
+      "n": 2,
+      "prompt_n": [
+        20066,
+        20066
+      ],
+      "prompt_per_second": [
+        777.9,
+        778.6
+      ],
+      "predicted_n": [
+        30,
+        30
+      ],
+      "predicted_per_second": [
+        43.0,
+        44.5
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        25,
+        26
+      ],
+      "draft_n_accepted": [
+        20,
+        21
+      ],
+      "wall_s": [
+        26.48173901700102,
+        26.529634300999533
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "mtp",
+      "case": "needle-code",
+      "n": 2,
+      "prompt_n": [
+        19462,
+        19462
+      ],
+      "prompt_per_second": [
+        807.1,
+        818.6
+      ],
+      "predicted_n": [
+        13,
+        13
+      ],
+      "predicted_per_second": [
+        43.7,
+        52.8
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        9,
+        11
+      ],
+      "draft_n_accepted": [
+        9,
+        11
+      ],
+      "wall_s": [
+        24.088731212999846,
+        24.375793670998974
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4",
+      "case": "short0",
+      "n": 2,
+      "prompt_n": [
+        36,
+        36
+      ],
+      "prompt_per_second": [
+        57.2,
+        63.2
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        42.3,
+        46.2
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        171,
+        173
+      ],
+      "draft_n_accepted": [
+        106,
+        108
+      ],
+      "wall_s": [
+        4.725035705001574,
+        5.168417124999905
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4",
+      "case": "short1",
+      "n": 2,
+      "prompt_n": [
+        36,
+        36
+      ],
+      "prompt_per_second": [
+        57.3,
+        58.6
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        59.6,
+        60.6
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        151,
+        151
+      ],
+      "draft_n_accepted": [
+        141,
+        141
+      ],
+      "wall_s": [
+        3.7851611160003813,
+        3.8533775270007027
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4",
+      "case": "short2",
+      "n": 2,
+      "prompt_n": [
+        37,
+        37
+      ],
+      "prompt_per_second": [
+        56.8,
+        57.2
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        47.6,
+        49.3
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        173,
+        174
+      ],
+      "draft_n_accepted": [
+        112,
+        115
+      ],
+      "wall_s": [
+        4.54638749500009,
+        4.684965824999381
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4",
+      "case": "code-25k",
+      "n": 2,
+      "prompt_n": [
+        20066,
+        20066
+      ],
+      "prompt_per_second": [
+        599.1,
+        600.5
+      ],
+      "predicted_n": [
+        30,
+        30
+      ],
+      "predicted_per_second": [
+        39.6,
+        48.6
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        23,
+        25
+      ],
+      "draft_n_accepted": [
+        20,
+        21
+      ],
+      "wall_s": [
+        34.06627487700098,
+        34.29363820300023
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4",
+      "case": "needle-code",
+      "n": 2,
+      "prompt_n": [
+        19462,
+        19462
+      ],
+      "prompt_per_second": [
+        611.3,
+        611.9
+      ],
+      "predicted_n": [
+        13,
+        13
+      ],
+      "predicted_per_second": [
+        32.9,
+        37.8
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        9,
+        12
+      ],
+      "draft_n_accepted": [
+        6,
+        7
+      ],
+      "wall_s": [
+        32.16429991000041,
+        32.24538743700032
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4km",
+      "case": "short0",
+      "n": 2,
+      "prompt_n": [
+        36,
+        36
+      ],
+      "prompt_per_second": [
+        63.8,
+        65.5
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        45.0,
+        46.2
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        171,
+        171
+      ],
+      "draft_n_accepted": [
+        112,
+        112
+      ],
+      "wall_s": [
+        4.717768004000391,
+        4.814079861000209
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4km",
+      "case": "short1",
+      "n": 2,
+      "prompt_n": [
+        36,
+        36
+      ],
+      "prompt_per_second": [
+        56.5,
+        58.3
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        39.7,
+        60.2
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        148,
+        152
+      ],
+      "draft_n_accepted": [
+        140,
+        141
+      ],
+      "wall_s": [
+        3.8074713999994856,
+        5.481125533000522
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4km",
+      "case": "short2",
+      "n": 2,
+      "prompt_n": [
+        37,
+        37
+      ],
+      "prompt_per_second": [
+        30.9,
+        58.4
+      ],
+      "predicted_n": [
+        192,
+        192
+      ],
+      "predicted_per_second": [
+        36.6,
+        49.4
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        168,
+        170
+      ],
+      "draft_n_accepted": [
+        113,
+        115
+      ],
+      "wall_s": [
+        4.5241297770007805,
+        6.450534106999839
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4km",
+      "case": "code-25k",
+      "n": 2,
+      "prompt_n": [
+        20066,
+        20066
+      ],
+      "prompt_per_second": [
+        708.0,
+        713.2
+      ],
+      "predicted_n": [
+        30,
+        30
+      ],
+      "predicted_per_second": [
+        41.5,
+        48.3
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        23,
+        27
+      ],
+      "draft_n_accepted": [
+        20,
+        21
+      ],
+      "wall_s": [
+        28.79230386800009,
+        29.099225615998876
+      ]
+    },
+    {
+      "phase": "fit32",
+      "arm": "q4km",
+      "case": "needle-code",
+      "n": 2,
+      "prompt_n": [
+        19462,
+        19462
+      ],
+      "prompt_per_second": [
+        705.9,
+        707.8
+      ],
+      "predicted_n": [
+        13,
+        13
+      ],
+      "predicted_per_second": [
+        30.9,
+        43.4
+      ],
+      "cache_n": [
+        0,
+        0
+      ],
+      "draft_n": [
+        9,
+        14
+      ],
+      "draft_n_accepted": [
+        6,
+        8
+      ],
+      "wall_s": [
+        27.810059739998906,
+        28.007101069999408
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "event": "parity",
+      "arm": "q4",
+      "match": true,
+      "at": 1792495801.1453543
+    },
+    {
+      "event": "parity",
+      "arm": "q4km",
+      "match": true,
+      "at": 1792495830.8028452
+    },
+    {
+      "event": "restore-service",
+      "exit": 0,
+      "stderr": "",
+      "at": 1792495831.9342952
+    },
+    {
+      "event": "needle",
+      "arm": "mtp",
+      "label": "fit32-boot0-mtp",
+      "pass": true,
+      "at": 1792495970.8739219
+    },
+    {
+      "event": "pi",
+      "arm": "fit32-mtp",
+      "wall_s": 36.24583579400132,
+      "exit": 0,
+      "pass": true,
+      "protected_unchanged": true,
+      "at": 1792496007.3100743
+    },
+    {
+      "event": "needle",
+      "arm": "q4",
+      "label": "fit32-boot1-q4",
+      "pass": true,
+      "at": 1792496172.74641
+    },
+    {
+      "event": "needle",
+      "arm": "q4km",
+      "label": "fit32-boot2-q4km",
+      "pass": true,
+      "at": 1792496331.5779426
+    },
+    {
+      "event": "pi",
+      "arm": "fit32-q4km",
+      "wall_s": 36.36376835400006,
+      "exit": 0,
+      "pass": true,
+      "protected_unchanged": true,
+      "at": 1792496368.1269128
+    },
+    {
+      "event": "needle",
+      "arm": "q4km",
+      "label": "fit32-boot3-q4km",
+      "pass": true,
+      "at": 1792496522.0847318
+    },
+    {
+      "event": "needle",
+      "arm": "q4",
+      "label": "fit32-boot4-q4",
+      "pass": true,
+      "at": 1792496685.3392138
+    },
+    {
+      "event": "needle",
+      "arm": "mtp",
+      "label": "fit32-boot5-mtp",
+      "pass": true,
+      "at": 1792496833.8911543
+    },
+    {
+      "event": "restore-service",
+      "exit": 0,
+      "stderr": "",
+      "at": 1792496894.9650695
+    },
+    {
+      "event": "restore-service",
+      "exit": 0,
+      "at": 1792496953.525757
+    }
+  ]
+}

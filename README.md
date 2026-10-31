@@ -1,3 +1,32 @@
+# Strata — RTX 2080 research fork
+
+This fork keeps our **current serving configuration, custom CUDA optimizations and experiment history in one repository**. Upstream: [Niko1221/Strata](https://github.com/Niko1221/Strata). This is a personal RTX 2080 research fork, not the official distribution.
+
+**Daily-use branch: `rtx2080` · Strata 0.2.9 / engine 0.1.55 · Swift 1.5 Flash-Next IQ2_XS · 128K context**
+
+| What you need | Where it lives |
+|---|---|
+| Exact current settings | [`rtx2080/profile.json`](rtx2080/profile.json) |
+| Setup, commands and patch inventory | [`rtx2080/README.md`](rtx2080/README.md) |
+| Tested engine version/hash | [`rtx2080/CURRENT.json`](rtx2080/CURRENT.json) |
+| Measurements and historical experiments | [`rtx2080/experiments/`](rtx2080/experiments/README.md) |
+| Persistent prefix-cache research | `experiment/persistent-prefix-cache` branch |
+| IQ1_M fused-prefill research | `experiment/iq1m-fused-prefill` branch |
+
+Current profile includes routing **1.5**, MTP, fused IQ prefill, Turing scoring, prefill VRAM loans, hot RAM-session restore and a **local** repeated-thinking recovery mode. The oMLX-inspired persistent-page cache and TensorFold-inspired IQ1_M adapter remain experimental branches, not production defaults.
+
+```sh
+python rtx2080/manage.py status       # current branch, profile and live health
+python rtx2080/manage.py show         # fully resolved configuration, no API key
+python rtx2080/manage.py bench        # usual three-repeat speed suite
+```
+
+Edit `rtx2080/profile.json` and restart `strata-serve.service`. Machine-local assets, binaries, logs and credentials live under ignored `runtime/`; no version-numbered checkout is needed for everyday use.
+
+---
+
+The upstream README follows. Its release links and general defaults describe upstream, while the profile above describes this fork's deployed configuration.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="apps/host/public/brand/strata-lockup-dark.svg">

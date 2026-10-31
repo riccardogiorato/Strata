@@ -1,0 +1,54 @@
+single-seed wall 148.95 cached 0 decode 39.3 out 27
+single-edited wall 151.37 cached 0 decode 43.2 out 27
+all-seed wall 151.16 cached 0 decode 40.6 out 27
+all-edited wall 133.65 cached 16384 decode 31.2 out 27
+dense-seed wall 152.03 cached 0 decode 34.9 out 27
+dense-edited wall 104.28 cached 40960 decode 26.5 out 27
+branch-seed-A wall 152.49 cached 0 decode 41.9 out 27
+branch-seed-B wall 33.3 cached 98304 decode 38.4 out 27
+branch-latest-1 wall 33.22 cached 98304 decode 42.1 out 27
+branch-indexed-1 wall 5.29 cached 121008 decode 32.5 out 27
+branch-indexed-2 wall 5.17 cached 121008 decode 34.8 out 27
+branch-latest-2 wall 33.03 cached 98304 decode 43.3 out 27
+branch-indexed-cold-1 wall 5.36 cached 121008 decode 41.9 out 27
+decode-seed wall 150.25 cached 0 decode 24.1 out 1
+decode-base wall 39.32 cached 120999 decode 54.2 out 2048
+decode-base-correctness wall 1.87 cached 0 decode 58.0 out 53
+decode-cost wall 40.28 cached 120999 decode 52.9 out 2048
+decode-cost-correctness wall 2.19 cached 0 decode 48.6 out 53
+decode-chain wall 38.62 cached 120999 decode 55.2 out 2048
+decode-chain-correctness wall 1.88 cached 0 decode 60.2 out 53
+decode-lookup8 wall 38.01 cached 120999 decode 56.7 out 2048
+decode-lookup8-correctness wall 1.87 cached 0 decode 62.2 out 53
+edit-seed wall 151.62 cached 0 decode 23.5 out 1
+edit-1-base wall 26.04 cached 122444 decode 58.4 out 1433
+edit-2-lookup8 wall 27.85 cached 122444 decode 54.4 out 1433
+edit-3-lookup8 wall 25.61 cached 122444 decode 59.9 out 1433
+edit-4-base wall 25.6 cached 122444 decode 59.7 out 1433
+hot-1-base wall 3.36 cached 121008 decode 26.7 out 27
+hot-2-promote wall 2.03 cached 121008 decode 39.7 out 27
+hot-3-promote wall 1.96 cached 121008 decode 43.2 out 27
+hot-4-base wall 3.02 cached 121008 decode 42.1 out 27
+decode-repeat-1-base wall 37.57 cached 120999 decode 57.1 out 2048
+decode-repeat-1-base-correctness wall 1.94 cached 0 decode 58.7 out 53
+decode-repeat-2-lookup8 wall 40.09 cached 120999 decode 53.3 out 2048
+decode-repeat-2-lookup8-correctness wall 1.8 cached 0 decode 59.4 out 53
+decode-repeat-3-lookup8 wall 41.35 cached 120999 decode 51.6 out 2048
+decode-repeat-3-lookup8-correctness wall 2.09 cached 0 decode 51.4 out 53
+decode-repeat-4-base wall 37.16 cached 120999 decode 57.6 out 2048
+decode-repeat-4-base-correctness wall 1.85 cached 0 decode 65.9 out 53
+q4-head-guard-long wall 3.29 cached 120999 decode 38.7 out 64
+q4-head-guard-correctness wall 1.77 cached 0 decode 59.3 out 53
+snapshot-small-seed wall 1.99 cached 121008 decode 43.0 out 27
+snapshot-1-all wall 1.93 cached 121008 decode 43.0 out 27
+snapshot-2-small wall 2.63 cached 120988 decode 39.2 out 27
+snapshot-3-small wall 2.54 cached 120988 decode 41.9 out 27
+snapshot-4-all wall 1.85 cached 121008 decode 42.4 out 27
+snapshot-5-small-cold wall 2.57 cached 120988 decode 39.3 out 27
+dense-final-edited wall 100.96 cached 40960 decode 43.5 out 27
+branch-latest-1 inclusive 35.54 cached 98304
+branch-indexed-1 inclusive 5.29 cached 121008
+branch-indexed-2 inclusive 5.17 cached 121008
+branch-latest-2 inclusive 35.33 cached 98304
+branch-indexed-cold-1 inclusive 5.36 cached 121008
+Correctness: 56 / 56

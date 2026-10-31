@@ -1,0 +1,437 @@
+{
+  "requests": [
+    {
+      "at": 1792999896.552873,
+      "label": "profile-base-cold",
+      "wall_s": 152.01625488400168,
+      "prompt_n": 120984,
+      "cached": 0,
+      "prefill_tps": 800.5,
+      "decode_tps": 37.9,
+      "output_n": 27,
+      "excluded": "Instrumented diagnostic, not a fair performance baseline."
+    },
+    {
+      "at": 1792999930.0614045,
+      "label": "profile-base-decode",
+      "wall_s": 31.897395302992663,
+      "prompt_n": 6318,
+      "cached": 114688,
+      "prefill_tps": 515.5,
+      "decode_tps": 52.4,
+      "output_n": 1024,
+      "excluded": "Instrumented diagnostic, not a fair performance baseline."
+    },
+    {
+      "at": 1792999932.816003,
+      "label": "profile-base-correctness",
+      "wall_s": 2.751845020990004,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 20.8,
+      "decode_tps": 60.5,
+      "output_n": 53,
+      "excluded": "Instrumented diagnostic, not a fair performance baseline."
+    },
+    {
+      "at": 1793000188.850877,
+      "label": "screen-fused-sm75-cold",
+      "wall_s": 136.55256878399814,
+      "prompt_n": 120984,
+      "cached": 0,
+      "prefill_tps": 895.7,
+      "decode_tps": 20.8,
+      "output_n": 27
+    },
+    {
+      "at": 1793000191.9431822,
+      "label": "screen-fused-sm75-correctness",
+      "wall_s": 3.0915841730020475,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 18.1,
+      "decode_tps": 57.1,
+      "output_n": 53
+    },
+    {
+      "at": 1793000416.406268,
+      "label": "screen-base",
+      "wall_s": 187.2528026550135,
+      "prompt_n": 121006,
+      "cached": 0,
+      "prefill_tps": 806.6,
+      "decode_tps": 55.3,
+      "output_n": 2048,
+      "excluded": "Snapshot fixture mismatch; cold instead of restored."
+    },
+    {
+      "at": 1793000602.827487,
+      "label": "decode-seed",
+      "wall_s": 150.91019563900772,
+      "prompt_n": 121006,
+      "cached": 0,
+      "prefill_tps": 802.9,
+      "decode_tps": 24.6,
+      "output_n": 1
+    },
+    {
+      "at": 1793000682.7362206,
+      "label": "screen-profile-decode",
+      "wall_s": 42.35854369100707,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 6.1,
+      "decode_tps": 49.9,
+      "output_n": 2048,
+      "excluded": "Instrumented diagnostic, not a fair performance baseline."
+    },
+    {
+      "at": 1793000684.548775,
+      "label": "screen-profile-decode-correctness",
+      "wall_s": 1.807771412000875,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 42.2,
+      "decode_tps": 60.5,
+      "output_n": 53
+    },
+    {
+      "at": 1793000746.1836877,
+      "label": "screen-base",
+      "wall_s": 40.715648690005764,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 7.8,
+      "decode_tps": 51.7,
+      "output_n": 2048
+    },
+    {
+      "at": 1793000747.9955325,
+      "label": "screen-base-correctness",
+      "wall_s": 1.8070482380135218,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 40.4,
+      "decode_tps": 63.2,
+      "output_n": 53
+    },
+    {
+      "at": 1793000809.2396502,
+      "label": "screen-gdn-split",
+      "wall_s": 40.27221887699852,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 6.4,
+      "decode_tps": 52.5,
+      "output_n": 2048
+    },
+    {
+      "at": 1793000811.2590048,
+      "label": "screen-gdn-split-correctness",
+      "wall_s": 2.014698485014378,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 34.2,
+      "decode_tps": 60.9,
+      "output_n": 53
+    },
+    {
+      "at": 1793000872.8307986,
+      "label": "screen-verify-fusion",
+      "wall_s": 40.449509687998216,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 7.7,
+      "decode_tps": 52.0,
+      "output_n": 2048,
+      "configuration_note": "LFUSE + HEAD only; HIP-only HC flag inactive on CUDA."
+    },
+    {
+      "at": 1793000874.6572318,
+      "label": "screen-verify-fusion-correctness",
+      "wall_s": 1.8218207680038176,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 40.7,
+      "decode_tps": 61.7,
+      "output_n": 53,
+      "configuration_note": "LFUSE + HEAD only; HIP-only HC flag inactive on CUDA."
+    },
+    {
+      "at": 1793000936.5449286,
+      "label": "screen-overlap",
+      "wall_s": 41.05192353700113,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 7.5,
+      "decode_tps": 51.3,
+      "output_n": 2048
+    },
+    {
+      "at": 1793000938.3008702,
+      "label": "screen-overlap-correctness",
+      "wall_s": 1.7512731989991153,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 40.5,
+      "decode_tps": 67.6,
+      "output_n": 53
+    },
+    {
+      "at": 1793001000.51864,
+      "label": "screen-shared-serial",
+      "wall_s": 40.01398772900575,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 7.4,
+      "decode_tps": 52.7,
+      "output_n": 2048
+    },
+    {
+      "at": 1793001002.3039682,
+      "label": "screen-shared-serial-correctness",
+      "wall_s": 1.7806967139913468,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 40.6,
+      "decode_tps": 64.9,
+      "output_n": 53
+    },
+    {
+      "at": 1793001576.5871334,
+      "label": "tab-cold-base",
+      "wall_s": 149.16999757099256,
+      "prompt_n": 120984,
+      "cached": 0,
+      "prefill_tps": 815.4,
+      "decode_tps": 42.7,
+      "output_n": 27
+    },
+    {
+      "at": 1793001747.3899024,
+      "label": "tab-cold-direct",
+      "wall_s": 151.11108245699143,
+      "prompt_n": 120984,
+      "cached": 0,
+      "prefill_tps": 804.9,
+      "decode_tps": 42.8,
+      "output_n": 27
+    },
+    {
+      "at": 1793001904.731613,
+      "label": "fused-8192",
+      "wall_s": 137.1092823390063,
+      "prompt_n": 120984,
+      "cached": 0,
+      "prefill_tps": 887.7,
+      "decode_tps": 42.6,
+      "output_n": 27
+    },
+    {
+      "at": 1793001979.2711244,
+      "label": "screen-q8-reuse",
+      "wall_s": 37.44805419900513,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 6.4,
+      "decode_tps": 56.6,
+      "output_n": 2048,
+      "excluded": "HIP-only HC flag inactive on CUDA; reuse was not exercised."
+    },
+    {
+      "at": 1793001981.046096,
+      "label": "screen-q8-reuse-correctness",
+      "wall_s": 1.7701567850017454,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 40.6,
+      "decode_tps": 66.0,
+      "output_n": 53,
+      "excluded": "HIP-only HC flag inactive on CUDA; reuse was not exercised."
+    },
+    {
+      "at": 1793002099.2545571,
+      "label": "screen-verify-fusion",
+      "wall_s": 9.9744860399951,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 6.7,
+      "decode_tps": 51.8,
+      "output_n": 454,
+      "excluded": "Malformed long-context code and premature stop; not a valid speed comparison."
+    },
+    {
+      "at": 1793002100.9167745,
+      "label": "screen-verify-fusion-correctness",
+      "wall_s": 1.6601526330050547,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 53.2,
+      "decode_tps": 57.5,
+      "output_n": 53
+    },
+    {
+      "at": 1793002125.2538893,
+      "label": "screen-q8-reuse",
+      "wall_s": 3.0930562150024343,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 6.8,
+      "decode_tps": 38.5,
+      "output_n": 73,
+      "excluded": "Malformed long-context code and premature stop; not a valid speed comparison."
+    },
+    {
+      "at": 1793002126.857087,
+      "label": "screen-q8-reuse-correctness",
+      "wall_s": 1.6024192850018153,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 57.6,
+      "decode_tps": 57.5,
+      "output_n": 53
+    },
+    {
+      "at": 1793002189.8733277,
+      "label": "screen-pcie-half",
+      "wall_s": 41.68011990499508,
+      "prompt_n": 7,
+      "cached": 120999,
+      "prefill_tps": 6.8,
+      "decode_tps": 50.6,
+      "output_n": 2048
+    },
+    {
+      "at": 1793002191.901862,
+      "label": "screen-pcie-half-correctness",
+      "wall_s": 2.0236862750025466,
+      "prompt_n": 39,
+      "cached": 0,
+      "prefill_tps": 37.3,
+      "decode_tps": 54.4,
+      "output_n": 53
+    },
+    {
+      "at": 1793002400.860239,
+      "label": "cold-edit-1-base",
+      "wall_s": 176.35711140399508,
+      "prompt_n": 122451,
+      "cached": 0,
+      "prefill_tps": 809.1,
+      "decode_tps": 57.7,
+      "output_n": 1433
+    },
+    {
+      "at": 1793002582.7513065,
+      "label": "cold-edit-2-fused",
+      "wall_s": 162.4034083220031,
+      "prompt_n": 122451,
+      "cached": 0,
+      "prefill_tps": 890.0,
+      "decode_tps": 58.1,
+      "output_n": 1433
+    },
+    {
+      "at": 1793002767.737679,
+      "label": "cold-edit-3-fused",
+      "wall_s": 164.4825085009943,
+      "prompt_n": 122451,
+      "cached": 0,
+      "prefill_tps": 888.4,
+      "decode_tps": 54.1,
+      "output_n": 1433
+    },
+    {
+      "at": 1793002964.4487264,
+      "label": "cold-edit-4-base",
+      "wall_s": 177.22109722900495,
+      "prompt_n": 122451,
+      "cached": 0,
+      "prefill_tps": 802.9,
+      "decode_tps": 58.4,
+      "output_n": 1433
+    }
+  ],
+  "validation": {
+    "correctness": {
+      "passed": 12,
+      "total": 12
+    },
+    "edit_correctness": {
+      "passed": 4,
+      "total": 4
+    },
+    "long_code_quality": {
+      "passed": 0,
+      "total": 2
+    },
+    "q8_reuse_activation": {
+      "passed": 1,
+      "total": 2
+    },
+    "retrieval_check": {
+      "passed": 5,
+      "total": 5
+    }
+  },
+  "failed_checks": [
+    {
+      "at": 1793001981.0625508,
+      "event": "q8_reuse_activation",
+      "label": "screen-q8-reuse",
+      "pass": false
+    },
+    {
+      "at": 1793002479.9809742,
+      "event": "long_code_quality",
+      "label": "screen-verify-fusion",
+      "request_at": 1793002099.2545571,
+      "pass": false,
+      "syntax_valid": false,
+      "syntax_error": "unterminated triple-quoted string literal (detected at line 152) (<unknown>, line 26)",
+      "reason": "Premature stop with malformed code; requested task queue implementation absent. Short dedupe smoke passed but does not validate this long-context path.",
+      "completion_tokens": 454,
+      "content_sha256": "1da69a0a833aa507d4d9c9132115bddbe5ac0435d4077abc5048ef64aeae17ea"
+    },
+    {
+      "at": 1793002479.9813647,
+      "event": "long_code_quality",
+      "label": "screen-q8-reuse",
+      "request_at": 1793002125.2538893,
+      "pass": false,
+      "syntax_valid": false,
+      "syntax_error": "invalid syntax (<unknown>, line 1)",
+      "reason": "Premature stop with malformed code; requested task queue implementation absent. Short dedupe smoke passed but does not validate this long-context path.",
+      "completion_tokens": 73,
+      "content_sha256": "8b0d193a9a17ef8fdde91f3bf66191b9f6dcad10a524af441c4997fa4b5c5dee"
+    }
+  ],
+  "cold_edit": {
+    "base": {
+      "n": 2,
+      "prefill_tps": 806.0032766447894,
+      "decode_tps": 58.057092850834195,
+      "mean_prompt_s": 151.92370000000003,
+      "mean_wall_s": 176.78910431650002,
+      "output_hashes": [
+        "4e9f4da909eb80ddf8447f462dddb576b3ce958cc5260468cbf7f76782bd6ab9"
+      ]
+    },
+    "fused": {
+      "n": 2,
+      "prefill_tps": 889.1775737377794,
+      "decode_tps": 56.05922796310966,
+      "mean_prompt_s": 137.71265,
+      "mean_wall_s": 163.4429584114987,
+      "output_hashes": [
+        "394b0d4da82663d036016424990002cce3728dd950ad9a2a2fcdba82b7cb4fdd"
+      ]
+    },
+    "comparison": {
+      "prefill_speedup": 1.1031934974746331,
+      "prompt_time_saved_pct": 9.354070497229872,
+      "request_time_saved_pct": 7.54919029461687
+    },
+    "all_four_correct": true
+  }
+}

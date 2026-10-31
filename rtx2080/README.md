@@ -1,0 +1,75 @@
+# RTX 2080 workspace
+
+The `rtx2080` branch is the production branch. **`profile.json` is the source of truth for serving settings.** `manage.py` expands its portable paths into the ignored `runtime/current.json` at every start. Credentials are read from `runtime/service.env`; they are never part of the public profile. `manage.py status` shows the selected branch, routing, guard and live health; `manage.py show` prints the resolved configuration without the API key.
+
+## Everyday commands
+
+Run from the repository root:
+
+```sh
+python rtx2080/manage.py status
+python rtx2080/manage.py show
+systemctl --user restart strata-serve.service
+python rtx2080/manage.py check
+python rtx2080/manage.py bench
+```
+
+Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `runtime/current.json`. There is no separate production setting hidden in an old version checkout. The native binary is `runtime/bin/strata`; its original tested hash and engine-source commit are in `CURRENT.json`. New builds do not replace it automatically.
+
+## Current production
+
+- Strata 0.2.9 / engine 0.1.55, CUDA SM75, RTX 2080 8 GB at 165 W, 64 GB system RAM.
+- Swift 1.5 Qwen3.8 Flash-Next GSQ-RCO IQ2_XS, 125B MoE, NVMe weights.
+- 131,072 context capacity; 32,768 GPU-resident INT8 KV tokens; KV prefetch.
+- MTP spec4 / minimum probability 0.70; routing prior 1.5.
+- 4,096 requested prefill chunk; 2,000 requested expert-cache slots, elastically resized.
+- PCIe fraction 0.35; adaptation every step, 80 swaps, decay 0.97.
+- 8 GiB / two-slot RAM session cache; minimum 1,024 tokens and park gain 1,024.
+- One active decode request at a time; waiting requests queue. Cache slots are not parallel decode slots.
+- CPU vision helper, three threads; authenticated API on port 8080; existing LAN access retained.
+- Client-controlled sampling, normal thinking template, output fitted to available context; local loop closure enabled.
+
+The current routing-on profile measured 62.16 native agent decode tok/s (10/10 tasks), 56.89 short-chat decode tok/s, 880.42 tok/s at 32K prefill and 846.76 tok/s at 121K cold prefill. These are the October 31 campaign results, not a new performance claim from moving directories. The migration keeps the tested executable byte-for-byte.
+
+## What is local and what is upstream
+
+Our enabled changes relative to upstream release `c62d5e3`:
+
+1. Exact Turing attention scorer, `STRATA_SCORES_TURING=2`: smaller 32-query / 128-thread tiles, same reduction order.
+2. SM75 native-IQ fused-prefill extension, `STRATA_PF_FUSED_SM75_IQ=1`: smaller tiles to fit IQ codebooks in Turing shared memory.
+3. Prefill VRAM loans: defer/release MTP, head and verifier allocations while reading a prompt, then restore them for generation; repeat loans at 8,192 unread tokens and above.
+4. Hot session restore: move restored state into the native RAM cache without recopying its large KV buffers.
+5. Local repeated-thinking closure (`reasoning_loop_recovery: close`): use upstream detection and budget-closure machinery to resume once within the original output cap. This is a mitigation, not proof that the model's underlying loop cause is fixed.
+
+MTP, residency-biased routing, PCIe expert access, native RAM conversation caching, adaptive expert caching, elastic cache allocation, KV prefetch and the general SM75 performance switches are upstream features. Upstream defaults also enable route-tail skipping at rank 7+ and CPU prompt sharing below 1,024 tokens. Routing and tail skipping can change outputs.
+
+Disabled: KVA approximate prefill, all-checkpoint persistence and plain-prompt mode. The experimental IQ1_M kernel and persistent prefix-page tier are **not enabled in production**.
+
+## Experiments without more top-level checkouts
+
+The same Git repository holds these branches:
+
+- `rtx2080`: current daily-use code and profile.
+- `experiment/persistent-prefix-cache`: oMLX-inspired persistent serialized prefix pages. Cold-restart and evicted-history recovery improved in the recorded experiments; saving remains synchronous and costs time. This is not a full oMLX implementation. See that branch's `docs/PERSISTENT_PREFIX_PAGES.md` and benchmark record.
+- `experiment/iq1m-fused-prefill`: TensorFold-inspired IQ1_M adapter, preserving draft PR #4642's existing code/history. It remains experimental and is not the production IQ2_XS optimization.
+
+Before switching the serving checkout to an experimental branch, stop `strata-serve.service`. Experimental branches retain their tested older base versions; do not apply the production profile blindly. Follow the branch's own build/configuration documentation. Return with `git switch rtx2080` and restart the service. Use separate ignored build outputs; do not overwrite `runtime/bin/strata` for a test.
+
+[Experiment index](experiments/README.md) contains 41 historical campaign records, measurements and patches, including unsuccessful candidates. Historical code snapshots are tags under `archive/2026-10-31/`; see `experiments/source-history.json`. The branches preserve source, not their old build directories. Raw local evidence and retired artifacts are retained privately under `runtime/archive/` and in the benchmark workspace; model weights, credentials and raw conversations are not pushed.
+
+## Build and local prerequisites
+
+A public clone contains code, the portable profile, tests and compact evidence. It does not contain model weights, packed assets, binaries, credentials or a Python environment.
+
+1. Create `runtime/venv` with Python 3.14 and install `requirements.txt` (plus monitor dependencies if using the monitor).
+2. Put model shards under `$HOME/models` matching `profile.json`, or set `STRATA_MODEL_ROOT` in the local environment file. Keep model licenses separate from this MIT code.
+3. Prepare the compatible dense/tokenizer pack, MTP runtime pack and expert profile using the upstream pack/setup tools. Their expected layout is `runtime/assets/packs/swift15-iq2xs-gsq`, `runtime/assets/mtp/rt` and `runtime/assets/data/expert-profile.bin`. The existing machine's validated assets were migrated unchanged.
+4. Build with `bash rtx2080/build.sh`. CUDA SM75 is explicit. CMake fetches pinned GGML `3cf03257` unless `STRATA_GGML_DIR` points to that checkout. The old machine's legacy dependency snapshot is retained under ignored `runtime/deps/`.
+5. With the service stopped, deliberately install a validated build as `runtime/bin/strata`. Build the upstream CPU vision helper if using the vision block; the current machine retains its validated helper under `runtime/bin/strata-vision`.
+6. Create `runtime/service.env` with `STRATA_API_KEY=<your chosen key>` and chmod it to 600. Do not commit it. Then `python rtx2080/manage.py install-service` and start the service.
+
+The generated user unit lives in `runtime/strata-serve.service`. The helper waits for the existing 165 W system power-limit setup; it does not change the power limit itself. The service uses the existing public/LAN binding specified by the profile; choose a different host there if required.
+
+## Cleanup record
+
+The old version folders existed for release comparisons, temporary builds and rollback copies. Source changes were saved as Git tags/branches before cleanup. Unique local configs/logs were archived, runtime assets were migrated, and the live process was checked before removing redundant directories. `runtime/archive/` holds the machine-specific preservation/deletion manifests; `experiments/source-history.json` is their public code-history index.

@@ -1,0 +1,411 @@
+{
+  "speed": {
+    "speed-base": {
+      "source": "speed-base/2026-10-30-community-rtx-2080-local-model/results.json",
+      "failures": [],
+      "skipped": {},
+      "chat": {
+        "prompt_tokens": 420,
+        "read_tokens": 420,
+        "reused_tokens": 0,
+        "generated_tokens": 900,
+        "prompt_ms": 5503.3,
+        "decode_ms": 15640.9,
+        "requests": 9,
+        "prefill_tps": 76.31784565624261,
+        "decode_tps": 57.541445824728754,
+        "prefix_token_hit_pct": 0.0,
+        "wall_mean_s": 2.352888888888889,
+        "ttft_mean_s": 0.6397777777777778
+      },
+      "prompts": {
+        "4K": {
+          "prompt_tokens": 12057,
+          "read_tokens": 12057,
+          "reused_tokens": 0,
+          "generated_tokens": 72,
+          "prompt_ms": 18060.7,
+          "decode_ms": 1406.6,
+          "requests": 3,
+          "prefill_tps": 667.5820981468049,
+          "decode_tps": 51.187260059718476,
+          "prefix_token_hit_pct": 0.0,
+          "wall_mean_s": 6.495666666666667,
+          "ttft_mean_s": 6.049666666666667,
+          "median_prefill_tps": 666.9
+        },
+        "16K": {
+          "prompt_tokens": 48174,
+          "read_tokens": 48174,
+          "reused_tokens": 0,
+          "generated_tokens": 72,
+          "prompt_ms": 54603.3,
+          "decode_ms": 1424.5,
+          "requests": 3,
+          "prefill_tps": 882.2543692414195,
+          "decode_tps": 50.54405054405054,
+          "prefix_token_hit_pct": 0.0,
+          "wall_mean_s": 18.691,
+          "ttft_mean_s": 18.247666666666667,
+          "median_prefill_tps": 881.9
+        },
+        "32K": {
+          "prompt_tokens": 96147,
+          "read_tokens": 96147,
+          "reused_tokens": 0,
+          "generated_tokens": 72,
+          "prompt_ms": 108788.7,
+          "decode_ms": 2126.5,
+          "requests": 3,
+          "prefill_tps": 883.795835413053,
+          "decode_tps": 33.85845285680696,
+          "prefix_token_hit_pct": 0.0,
+          "wall_mean_s": 37.0,
+          "ttft_mean_s": 36.32933333333333,
+          "median_prefill_tps": 884.4
+        }
+      },
+      "conversation_probe": {
+        "hit_pct": {
+          "median": 69.421,
+          "min": 69.264,
+          "max": 69.531,
+          "n": 3
+        },
+        "reread_tokens": {
+          "median": 4,
+          "min": 2,
+          "max": 74,
+          "n": 3
+        },
+        "new_tokens": {
+          "median": 11950,
+          "min": 11950,
+          "max": 11951,
+          "n": 3
+        },
+        "turn_ttft_s": {
+          "median": 5.011,
+          "min": 3.202,
+          "max": 6.364,
+          "n": 15
+        },
+        "last_turn_prompt_tokens": {
+          "median": 12805,
+          "min": 12801,
+          "max": 12832,
+          "n": 3
+        },
+        "turn_decode_tps": {
+          "median": 61.5,
+          "min": 22.2,
+          "max": 67.1,
+          "n": 15
+        },
+        "first_turn_ttft_s": {
+          "median": 2.234,
+          "min": 2.189,
+          "max": 2.52,
+          "n": 3
+        }
+      }
+    },
+    "speed-pages": {
+      "source": "speed-pages/2026-10-30-community-rtx-2080-local-model/results.json",
+      "failures": [],
+      "skipped": {},
+      "chat": {
+        "prompt_tokens": 420,
+        "read_tokens": 420,
+        "reused_tokens": 0,
+        "generated_tokens": 900,
+        "prompt_ms": 5832.5,
+        "decode_ms": 16063.0,
+        "requests": 9,
+        "prefill_tps": 72.0102871838834,
+        "decode_tps": 56.02938429932142,
+        "prefix_token_hit_pct": 0.0,
+        "wall_mean_s": 2.4364444444444446,
+        "ttft_mean_s": 0.6748888888888889
+      },
+      "prompts": {
+        "4K": {
+          "prompt_tokens": 12057,
+          "read_tokens": 12057,
+          "reused_tokens": 0,
+          "generated_tokens": 72,
+          "prompt_ms": 18360.1,
+          "decode_ms": 1539.4,
+          "requests": 3,
+          "prefill_tps": 656.6957696308845,
+          "decode_tps": 46.771469403663765,
+          "prefix_token_hit_pct": 0.0,
+          "wall_mean_s": 6.639666666666667,
+          "ttft_mean_s": 6.150666666666667,
+          "median_prefill_tps": 654.6
+        },
+        "16K": {
+          "prompt_tokens": 48174,
+          "read_tokens": 48174,
+          "reused_tokens": 0,
+          "generated_tokens": 72,
+          "prompt_ms": 55711.6,
+          "decode_ms": 1402.9,
+          "requests": 3,
+          "prefill_tps": 864.7032215911946,
+          "decode_tps": 51.322261030722075,
+          "prefix_token_hit_pct": 0.0,
+          "wall_mean_s": 21.181333333333335,
+          "ttft_mean_s": 18.616333333333333,
+          "median_prefill_tps": 867.2
+        },
+        "32K": {
+          "prompt_tokens": 96147,
+          "read_tokens": 96147,
+          "reused_tokens": 0,
+          "generated_tokens": 72,
+          "prompt_ms": 109126.3,
+          "decode_ms": 1725.2,
+          "requests": 3,
+          "prefill_tps": 881.0616689102443,
+          "decode_tps": 41.73429167632738,
+          "prefix_token_hit_pct": 0.0,
+          "wall_mean_s": 40.60366666666667,
+          "ttft_mean_s": 36.44233333333333,
+          "median_prefill_tps": 881.1
+        }
+      },
+      "conversation_probe": {
+        "hit_pct": {
+          "median": 69.35,
+          "min": 69.237,
+          "max": 69.472,
+          "n": 3
+        },
+        "reread_tokens": {
+          "median": 73,
+          "min": 1,
+          "max": 73,
+          "n": 3
+        },
+        "new_tokens": {
+          "median": 11949,
+          "min": 11947,
+          "max": 11951,
+          "n": 3
+        },
+        "turn_ttft_s": {
+          "median": 5.094,
+          "min": 3.204,
+          "max": 6.346,
+          "n": 15
+        },
+        "last_turn_prompt_tokens": {
+          "median": 12823,
+          "min": 12794,
+          "max": 12835,
+          "n": 3
+        },
+        "turn_decode_tps": {
+          "median": 54.6,
+          "min": 32.9,
+          "max": 62.1,
+          "n": 15
+        },
+        "first_turn_ttft_s": {
+          "median": 2.197,
+          "min": 2.195,
+          "max": 2.271,
+          "n": 3
+        }
+      }
+    }
+  },
+  "memory": {
+    "smoke-seed": {
+      "pid": "1882592",
+      "samples": 3,
+      "peak_rss_gib": 38.534053802490234,
+      "peak_hwm_gib": 38.69425582885742,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 17.607513427734375,
+      "max_gpu_used_mib": 7588.0
+    },
+    "smoke-restart": {
+      "pid": "1882978",
+      "samples": 5,
+      "peak_rss_gib": 38.483158111572266,
+      "peak_hwm_gib": 38.772239685058594,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 17.74994659423828,
+      "max_gpu_used_mib": 7568.0
+    },
+    "base-r1-seed": {
+      "pid": "1883256",
+      "samples": 64,
+      "peak_rss_gib": 48.552974700927734,
+      "peak_hwm_gib": 48.98695373535156,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 10.141712188720703,
+      "max_gpu_used_mib": 7306.0
+    },
+    "base-r1-restart": {
+      "pid": "1886460",
+      "samples": 48,
+      "peak_rss_gib": 46.07951354980469,
+      "peak_hwm_gib": 46.18758010864258,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 13.563594818115234,
+      "max_gpu_used_mib": 7310.0
+    },
+    "pages-r1-seed": {
+      "pid": "1888442",
+      "samples": 67,
+      "peak_rss_gib": 51.871177673339844,
+      "peak_hwm_gib": 52.15037155151367,
+      "peak_swap_gib": 3.6438331604003906,
+      "min_host_available_gib": 5.903797149658203,
+      "max_gpu_used_mib": 7588.0
+    },
+    "pages-r1-restart": {
+      "pid": "1891269",
+      "samples": 23,
+      "peak_rss_gib": 49.142059326171875,
+      "peak_hwm_gib": 49.244712829589844,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 9.74923324584961,
+      "max_gpu_used_mib": 7588.0
+    },
+    "pages-r2-seed": {
+      "pid": "1892327",
+      "samples": 66,
+      "peak_rss_gib": 52.30936813354492,
+      "peak_hwm_gib": 52.39569091796875,
+      "peak_swap_gib": 0.043914794921875,
+      "min_host_available_gib": 6.024131774902344,
+      "max_gpu_used_mib": 7588.0
+    },
+    "pages-r2-restart": {
+      "pid": "1895048",
+      "samples": 23,
+      "peak_rss_gib": 49.31642532348633,
+      "peak_hwm_gib": 49.319766998291016,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 9.632575988769531,
+      "max_gpu_used_mib": 7588.0
+    },
+    "base-r2-seed": {
+      "pid": "1896015",
+      "samples": 64,
+      "peak_rss_gib": 48.63615036010742,
+      "peak_hwm_gib": 48.962646484375,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 10.388580322265625,
+      "max_gpu_used_mib": 7588.0
+    },
+    "base-r2-restart": {
+      "pid": "1898661",
+      "samples": 48,
+      "peak_rss_gib": 45.68870544433594,
+      "peak_hwm_gib": 45.68870544433594,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 13.880134582519531,
+      "max_gpu_used_mib": 7328.0
+    },
+    "long-agent-base-boot1": {
+      "pid": "1902601",
+      "samples": 38,
+      "peak_rss_gib": 42.95276641845703,
+      "peak_hwm_gib": 42.95276641845703,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 16.89239501953125,
+      "max_gpu_used_mib": 7638.0
+    },
+    "long-agent-pages-boot0": {
+      "pid": "1904892",
+      "samples": 34,
+      "peak_rss_gib": 46.478851318359375,
+      "peak_hwm_gib": 46.4803352355957,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 13.21609878540039,
+      "max_gpu_used_mib": 7588.0
+    },
+    "long-agent-pages-boot1": {
+      "pid": "1906407",
+      "samples": 12,
+      "peak_rss_gib": 47.435428619384766,
+      "peak_hwm_gib": 47.46148681640625,
+      "peak_swap_gib": 0.02667236328125,
+      "min_host_available_gib": 9.175224304199219,
+      "max_gpu_used_mib": 7630.0
+    },
+    "agent-base": {
+      "pid": "1907649",
+      "samples": 156,
+      "peak_rss_gib": 44.579307556152344,
+      "peak_hwm_gib": 45.672752380371094,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 13.981769561767578,
+      "max_gpu_used_mib": 7642.0
+    },
+    "agent-pages": {
+      "pid": "1931379",
+      "samples": 191,
+      "peak_rss_gib": 50.75428771972656,
+      "peak_hwm_gib": 50.75428771972656,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 7.047721862792969,
+      "max_gpu_used_mib": 7642.0
+    },
+    "speed-base": {
+      "pid": "1971024",
+      "samples": 63,
+      "peak_rss_gib": 40.16206359863281,
+      "peak_hwm_gib": 40.4864501953125,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 16.109237670898438,
+      "max_gpu_used_mib": 7638.0
+    },
+    "speed-pages": {
+      "pid": "1975447",
+      "samples": 72,
+      "peak_rss_gib": 41.49973678588867,
+      "peak_hwm_gib": 42.443538665771484,
+      "peak_swap_gib": 0.0,
+      "min_host_available_gib": 14.940731048583984,
+      "max_gpu_used_mib": 7624.0
+    },
+    "ram4-hot1": {
+      "pid": "1980162",
+      "samples": 68,
+      "peak_rss_gib": 48.13142776489258,
+      "peak_hwm_gib": 49.56383514404297,
+      "peak_swap_gib": 0.05991363525390625,
+      "min_host_available_gib": 9.269512176513672,
+      "max_gpu_used_mib": 7606.0
+    },
+    "ram0-hot4": {
+      "pid": "1982917",
+      "samples": 68,
+      "peak_rss_gib": 48.0138053894043,
+      "peak_hwm_gib": 48.19333267211914,
+      "peak_swap_gib": 0.008403778076171875,
+      "min_host_available_gib": 9.868736267089844,
+      "max_gpu_used_mib": 7606.0
+    },
+    "ram2-hot4": {
+      "pid": "1985843",
+      "samples": 66,
+      "peak_rss_gib": 48.194828033447266,
+      "peak_hwm_gib": 49.2955207824707,
+      "peak_swap_gib": 0.015625,
+      "min_host_available_gib": 9.930622100830078,
+      "max_gpu_used_mib": 7606.0
+    }
+  },
+  "definitions": {
+    "rates": "Total tokens divided by total native engine seconds; wall/TTFT means include cache overhead.",
+    "memory": "Five-second /proc and nvidia-smi samples, grouped by native GPU PID observed just after health-ready. Peaks can miss shorter spikes.",
+    "swap": "Per-process VmSwap, not the system swap total. Nonzero values indicate pages swapped out, not a direct measurement of stall time."
+  }
+}

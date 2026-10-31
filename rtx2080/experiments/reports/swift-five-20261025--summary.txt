@@ -1,0 +1,23 @@
+borrowing/off {"n": 2, "wall_s": 243.58356647750043, "ttft_s": 204.1776960109928, "prefill_tps": 593.3, "decode_tps": 51.900000000000006, "output_tokens": [2048, 2048], "cached_tokens": [0, 0]}
+borrowing/on {"n": 2, "wall_s": 188.59548866699333, "ttft_s": 150.10191718400165, "prefill_tps": 807.3, "decode_tps": 53.150000000000006, "output_tokens": [2048, 2048], "cached_tokens": [0, 0]}
+checkpoint/default {"n": 2, "wall_s": 133.8098324639941, "ttft_s": 133.12457976949372, "prefill_tps": 786.75, "decode_tps": 41.0, "output_tokens": [27, 27], "cached_tokens": [16384, 16384]}
+checkpoint/spread {"n": 2, "wall_s": 133.42553219149704, "ttft_s": 132.9586150259929, "prefill_tps": 787.7, "decode_tps": 53.85, "output_tokens": [27, 27], "cached_tokens": [16384, 16384]}
+prefix/default {"n": 2, "wall_s": 12.950652310995793, "ttft_s": 12.794647274000454, "prefill_tps": 497.85, "decode_tps": 47.150000000000006, "output_tokens": [8, 8], "cached_tokens": [114688, 114688]}
+prefix/pinned {"n": 2, "wall_s": 0.7509474675025558, "ttft_s": 0.591517370994552, "prefill_tps": 54.25, "decode_tps": 44.25, "output_tokens": [8, 8], "cached_tokens": [120955, 120955]}
+kernel/base {"n": 2, "wall_s": 38.97771742600162, "ttft_s": 1.727311226502934, "prefill_tps": 4.65, "decode_tps": 54.95, "output_tokens": [2048, 2048], "cached_tokens": [120999, 120999]}
+kernel/exact1 {"n": 2, "wall_s": 39.06131921451015, "ttft_s": 1.815328770004271, "prefill_tps": 4.4, "decode_tps": 55.0, "output_tokens": [2048, 2048], "cached_tokens": [120999, 120999]}
+retention/off {"n": 2, "wall_s": 40.06441963950056, "ttft_s": 1.5731408549909247, "prefill_tps": 5.199999999999999, "decode_tps": 53.2, "output_tokens": [2048, 2048], "cached_tokens": [120999, 120999]}
+retention/on {"n": 2, "wall_s": 38.900007768999785, "ttft_s": 1.977904014500382, "prefill_tps": 3.95, "decode_tps": 55.45, "output_tokens": [2048, 2048], "cached_tokens": [120999, 120999]}
+sustained/base/long {"n": 1, "wall_s": 39.52713018999202, "ttft_s": 1.1943637799995486, "prefill_tps": 7.1, "decode_tps": 53.4, "output_tokens": [2048], "cached_tokens": [120999]}
+sustained/base/continue {"n": 1, "wall_s": 42.58391641800699, "ttft_s": 5.903659955001785, "prefill_tps": 359.1, "decode_tps": 55.8, "output_tokens": [2048], "cached_tokens": [121006]}
+sustained/auto/long {"n": 1, "wall_s": 39.95795055000053, "ttft_s": 1.199746052006958, "prefill_tps": 7.2, "decode_tps": 52.8, "output_tokens": [2048], "cached_tokens": [120999]}
+sustained/auto/continue {"n": 1, "wall_s": 37.5434353449964, "ttft_s": 0.9548550999897998, "prefill_tps": 46.3, "decode_tps": 55.9, "output_tokens": [2048], "cached_tokens": [123053]}
+sustained/async/long {"n": 1, "wall_s": 39.50840768600756, "ttft_s": 0.9182682690006914, "prefill_tps": 10.1, "decode_tps": 53.0, "output_tokens": [2048], "cached_tokens": [120999]}
+sustained/async/continue {"n": 1, "wall_s": 44.38977234099002, "ttft_s": 5.894666801992571, "prefill_tps": 359.6, "decode_tps": 53.1, "output_tokens": [2048], "cached_tokens": [121006]}
+sustained/overlap/long {"n": 1, "wall_s": 39.759250292001525, "ttft_s": 1.2159678099997109, "prefill_tps": 7.0, "decode_tps": 53.1, "output_tokens": [2048], "cached_tokens": [120999]}
+sustained/overlap/continue {"n": 1, "wall_s": 36.88478475500597, "ttft_s": 0.8730995380028617, "prefill_tps": 51.1, "decode_tps": 56.8, "output_tokens": [2048], "cached_tokens": [123053]}
+sustained/mtp2/long {"n": 1, "wall_s": 43.97904138600279, "ttft_s": 1.21301739399496, "prefill_tps": 7.1, "decode_tps": 47.8, "output_tokens": [2048], "cached_tokens": [120999]}
+sustained/mtp2/continue {"n": 1, "wall_s": 42.52052411700424, "ttft_s": 0.9659370029985439, "prefill_tps": 46.3, "decode_tps": 49.2, "output_tokens": [2048], "cached_tokens": [123053]}
+sustained/mtp6/long {"n": 1, "wall_s": 46.232538649011985, "ttft_s": 1.1723700550064677, "prefill_tps": 7.3, "decode_tps": 45.4, "output_tokens": [2048], "cached_tokens": [120999]}
+sustained/mtp6/continue {"n": 1, "wall_s": 35.728805006001494, "ttft_s": 1.1335623000049964, "prefill_tps": 38.7, "decode_tps": 49.8, "output_tokens": [1725], "cached_tokens": [123053]}
+checks {"total": 33, "failed": []}

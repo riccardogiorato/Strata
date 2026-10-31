@@ -1,0 +1,347 @@
+{
+  "standard": {
+    "before": {
+      "file": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-production-ab-20261026/before-speed/2026-10-26-community-rtx-2080-local-model/results.json",
+      "metrics": {
+        "chat_decode_tps": {
+          "median": 45.5,
+          "min": 41.3,
+          "max": 56.0,
+          "n": 9
+        },
+        "chat_ttft_s": {
+          "median": 0.874,
+          "min": 0.74,
+          "max": 0.953,
+          "n": 9
+        },
+        "4K_prefill_tps": {
+          "median": 583.3,
+          "min": 575.0,
+          "max": 583.7,
+          "n": 3
+        },
+        "4K_ttft_s": {
+          "median": 6.935,
+          "min": 6.916,
+          "max": 7.022,
+          "n": 3
+        },
+        "16K_prefill_tps": {
+          "median": 611.1,
+          "min": 609.7,
+          "max": 611.1,
+          "n": 3
+        },
+        "16K_ttft_s": {
+          "median": 26.317,
+          "min": 26.312,
+          "max": 26.378,
+          "n": 3
+        },
+        "32K_prefill_tps": {
+          "median": 607.2,
+          "min": 604.7,
+          "max": 610.5,
+          "n": 3
+        },
+        "32K_ttft_s": {
+          "median": 52.839,
+          "min": 52.549,
+          "max": 53.054,
+          "n": 3
+        },
+        "agent_decode_tps": {
+          "median": 46.4,
+          "min": 39.9,
+          "max": 63.6,
+          "n": 15
+        },
+        "agent_ttft_s": {
+          "median": 5.551,
+          "min": 3.179,
+          "max": 6.355,
+          "n": 15
+        },
+        "agent_cache_hit_pct": {
+          "median": 69.658,
+          "min": 69.493,
+          "max": 69.695,
+          "n": 3
+        }
+      },
+      "failures": [],
+      "skipped": {},
+      "elapsed_s": 404.5207223892212
+    },
+    "after": {
+      "file": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-production-ab-20261026/after-speed/2026-10-26-community-rtx-2080-local-model/results.json",
+      "metrics": {
+        "chat_decode_tps": {
+          "median": 43.5,
+          "min": 26.9,
+          "max": 53.4,
+          "n": 9
+        },
+        "chat_ttft_s": {
+          "median": 0.997,
+          "min": 0.794,
+          "max": 1.967,
+          "n": 9
+        },
+        "4K_prefill_tps": {
+          "median": 567.3,
+          "min": 566.0,
+          "max": 579.1,
+          "n": 3
+        },
+        "4K_ttft_s": {
+          "median": 7.116,
+          "min": 6.974,
+          "max": 7.133,
+          "n": 3
+        },
+        "16K_prefill_tps": {
+          "median": 600.8,
+          "min": 600.3,
+          "max": 602.2,
+          "n": 3
+        },
+        "16K_ttft_s": {
+          "median": 26.767,
+          "min": 26.707,
+          "max": 26.788,
+          "n": 3
+        },
+        "32K_prefill_tps": {
+          "median": 606.4,
+          "min": 605.3,
+          "max": 606.4,
+          "n": 3
+        },
+        "32K_ttft_s": {
+          "median": 52.904,
+          "min": 52.902,
+          "max": 53.005,
+          "n": 3
+        },
+        "agent_decode_tps": {
+          "median": 41.9,
+          "min": 29.0,
+          "max": 50.4,
+          "n": 15
+        },
+        "agent_ttft_s": {
+          "median": 5.367,
+          "min": 3.218,
+          "max": 6.256,
+          "n": 15
+        },
+        "agent_cache_hit_pct": {
+          "median": 69.626,
+          "min": 69.424,
+          "max": 69.672,
+          "n": 3
+        }
+      },
+      "failures": [],
+      "skipped": {},
+      "elapsed_s": 410.354532957077
+    },
+    "tuned": {
+      "file": "${WORKSPACE}/local-ai-rtx2080/experiments/strata-production-ab-20261026/tuned-speed/2026-10-26-community-rtx-2080-local-model/results.json",
+      "metrics": {
+        "chat_decode_tps": {
+          "median": 47.2,
+          "min": 42.0,
+          "max": 55.2,
+          "n": 9
+        },
+        "chat_ttft_s": {
+          "median": 0.863,
+          "min": 0.749,
+          "max": 1.148,
+          "n": 9
+        },
+        "4K_prefill_tps": {
+          "median": 663.7,
+          "min": 660.9,
+          "max": 663.9,
+          "n": 3
+        },
+        "4K_ttft_s": {
+          "median": 6.09,
+          "min": 6.086,
+          "max": 6.115,
+          "n": 3
+        },
+        "16K_prefill_tps": {
+          "median": 916.9,
+          "min": 916.4,
+          "max": 919.0,
+          "n": 3
+        },
+        "16K_ttft_s": {
+          "median": 17.57,
+          "min": 17.52,
+          "max": 17.573,
+          "n": 3
+        },
+        "32K_prefill_tps": {
+          "median": 926.2,
+          "min": 925.9,
+          "max": 928.0,
+          "n": 3
+        },
+        "32K_ttft_s": {
+          "median": 34.678,
+          "min": 34.601,
+          "max": 34.695,
+          "n": 3
+        },
+        "agent_decode_tps": {
+          "median": 44.7,
+          "min": 39.4,
+          "max": 48.5,
+          "n": 15
+        },
+        "agent_ttft_s": {
+          "median": 5.136,
+          "min": 3.175,
+          "max": 6.226,
+          "n": 15
+        },
+        "agent_cache_hit_pct": {
+          "median": 69.629,
+          "min": 69.442,
+          "max": 69.681,
+          "n": 3
+        }
+      },
+      "failures": [],
+      "skipped": {},
+      "elapsed_s": 319.26074171066284
+    }
+  },
+  "long_context": {
+    "before": {
+      "n": 2,
+      "prefill_tps": 590.0930238273713,
+      "decode_tps": 54.38237297655258,
+      "mean_wall_s": 234.0276803569941,
+      "mean_prompt_s": 207.51135,
+      "input_tokens": [
+        122451,
+        122451
+      ],
+      "output_tokens": [
+        1433,
+        1433
+      ]
+    },
+    "after": {
+      "n": 2,
+      "prefill_tps": 601.4072667773207,
+      "decode_tps": 56.974619854442366,
+      "mean_wall_s": 228.92769913749362,
+      "mean_prompt_s": 203.60745000000003,
+      "input_tokens": [
+        122451,
+        122451
+      ],
+      "output_tokens": [
+        1433,
+        1433
+      ]
+    },
+    "tuned": {
+      "n": 2,
+      "prefill_tps": 886.3398732786817,
+      "decode_tps": 59.99217129376697,
+      "mean_wall_s": 162.2292867780052,
+      "mean_prompt_s": 138.15355,
+      "input_tokens": [
+        122451,
+        122451
+      ],
+      "output_tokens": [
+        1433,
+        1433
+      ]
+    },
+    "correctness": [
+      {
+        "at": 1793008592.6746492,
+        "event": "edit_correctness",
+        "label": "long-edit-1-before",
+        "pass": true,
+        "error": null
+      },
+      {
+        "at": 1793008851.9317477,
+        "event": "edit_correctness",
+        "label": "long-edit-2-after",
+        "pass": true,
+        "error": null
+      },
+      {
+        "at": 1793009109.6203408,
+        "event": "edit_correctness",
+        "label": "long-edit-3-after",
+        "pass": true,
+        "error": null
+      },
+      {
+        "at": 1793009373.8656309,
+        "event": "edit_correctness",
+        "label": "long-edit-4-before",
+        "pass": true,
+        "error": null
+      },
+      {
+        "at": 1793009931.9538217,
+        "event": "edit_correctness",
+        "label": "long-edit-5-tuned",
+        "pass": true,
+        "error": null
+      },
+      {
+        "at": 1793010125.2376657,
+        "event": "edit_correctness",
+        "label": "long-edit-6-tuned",
+        "pass": true,
+        "error": null
+      }
+    ]
+  },
+  "agentic": {
+    "before": {
+      "passed": 11,
+      "passed_excluding_task8": 10,
+      "task_wall_seconds": 1077,
+      "task_wall_seconds_excluding_task8": 650,
+      "generated_tokens": 39687,
+      "decode_seconds": 820.032,
+      "prompt_read_tokens": 79757,
+      "prompt_seconds": 223.231,
+      "engine_requests": 118,
+      "decode_tps": 48.396891828611565,
+      "failed_tasks": [],
+      "violations": {}
+    },
+    "tuned": {
+      "passed": 11,
+      "passed_excluding_task8": 10,
+      "task_wall_seconds": 899,
+      "task_wall_seconds_excluding_task8": 700,
+      "generated_tokens": 32315,
+      "decode_seconds": 683.905,
+      "prompt_read_tokens": 68356,
+      "prompt_seconds": 186.954,
+      "engine_requests": 98,
+      "decode_tps": 47.250714646040024,
+      "failed_tasks": [],
+      "violations": {}
+    }
+  }
+}

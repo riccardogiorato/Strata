@@ -1,0 +1,179 @@
+diff --git a/docs/DETAILS.md b/docs/DETAILS.md
+index 0fddc11..60d4214 100644
+--- a/docs/DETAILS.md
++++ b/docs/DETAILS.md
+@@ -468,7 +468,7 @@ applies at the next start. Network, key, MCP and program keys are not editable t
+ | `reasoning_budget_tokens` | `0` (no budget) | Caps the thinking at N tokens: the server ends it with a short wrap-up line and `</think>` and the model answers from there. The wrap-up counts as output tokens. A request's own `reasoning_budget_tokens` (or llama.cpp's `thinking_budget_tokens`) wins. |
+ | `answer_room` | on | A request with thinking on, no budget and `max_tokens` of 1,024 or more gets one: thinking is wrapped up when a quarter of the cap (at least 512 tokens) is left. Requests without `max_tokens` get three quarters of the context. `false` turns it off. Clients should not cap the reply far below what the context allows. |
+ | `reasoning_close_retry` | off | Closes the thinking once and continues when a reply ended inside its thinking with no answer and no tool call (#1053). |
+-| `reasoning_loop_recovery` | off | `"stop"` ends, `"recover"` (or `true`) restarts once, a reply whose reasoning repeats whole passages. Checked every 512 output tokens. It can mistake repeated useful code for a loop, so keep the answer quality alongside the completion rate when testing it (#728). |
++| `reasoning_loop_recovery` | off | `"stop"` ends, `"recover"` (or `true`) restarts once, a reply whose reasoning repeats whole passages. Local `"close"` mode closes the looping thought and continues to the answer or tool call with the same prompt and sampling settings, within the original output limit. It needs no particular effort sentence. Checked every 512 output tokens; only reasoning is inspected. It can mistake repeated useful code for a loop, so keep answer quality alongside completion rate when testing it (#728). |
+ | `repeat_stop_tokens` | `256` | A reply that repeats one token this many times in a row ends as `"length"`. `0` turns it off. |
+ | `effort_position` | `"start"` | `"end"` puts a `low` or `medium` effort in a short system turn right before the answer, so a request that only changes the effort reuses the conversation cache. How well the model follows a level in that place is not measured. |
+ | `anthropic_thinking` | as the template | `"on_request"` renders a `/v1/messages` request that asks for no thinking without thinking, as Anthropic does. Claude Code's short helper calls need it. |
+diff --git a/serve/server.py b/serve/server.py
+index cca9cbb..e9cc239 100644
+--- a/serve/server.py
++++ b/serve/server.py
+@@ -225,7 +225,8 @@ REASONING_CLOSE = "\n</think>\n\n"
+ REASONING_WRAP_UP = "\n\nI have thought about this long enough; time to give my answer.\n</think>\n\n"
+ # #728: opt-in handling of reasoning that repeats whole passages (which the single-token guard above cannot see).
+ # "reasoning_loop_recovery": "stop" ends the reply there; "recover" (or true) goes on from the same output with the
+-# low-effort instruction in place of the xhigh one.  Both off by default.
++# low-effort instruction in place of the xhigh one. "close" instead closes the detected looping thought and
++# continues to the answer/tool call, with the original prompt and sampler. All are off by default.
+ HIGH_EFFORT = EFFORT_TEXT["xhigh"]
+ LOW_EFFORT = EFFORT_TEXT["low"]
+ LOOP_CHECK_EVERY = 512           # output tokens between two looks at the reasoning (at a clean parser boundary)
+@@ -5547,6 +5548,7 @@ class Service:
+         timings, before = None, None                    # this request's timings; the engine's `last` before it
+         recovery_count, reasoning_text, repeat_coverage = 0, "", 0.0
+         looped, next_loop_check = False, LOOP_CHECK_EVERY       # #728: reasoning that repeats whole passages
++        loop_closed = False                             # opt-in "close": reuse the bounded budget-wrap path
+         raw_ids = []                                    # every generated id (STRATA_DEBUG: dump raw model text)
+         emb, self.embeddings.path = getattr(self.embeddings, "path", None), None   # this run's to delete now
+         img_keys, self.embeddings.keys = getattr(self.embeddings, "keys", None), None
+@@ -5728,6 +5730,21 @@ class Service:
+                                     next_loop_check = n + LOOP_CHECK_EVERY
+                                     repeat_coverage = reasoning_repeat_coverage(reasoning_text)
+                                     if repeat_coverage >= LOOP_COVERAGE:
++                                        if self.reasoning_loop_recovery == "close":
++                                            # Do not rewrite the system prompt or resample the request. The same
++                                            # token-preserving path as a reasoning budget leaves room for a tool
++                                            # call/answer; injected tokens count against the shared output cap.
++                                            wrap = loop_closed = True
++                                            recovery_count += 1
++                                            with self.status_lock:
++                                                st["reasoning_recoveries"] = recovery_count
++                                            if trace is not None:
++                                                trace["reasoning_recoveries"] = recovery_count
++                                                trace["reasoning_repeat_coverage"] = round(repeat_coverage, 3)
++                                            print(f"[strata] repeated reasoning detected at {n} tokens "
++                                                  f"(coverage={repeat_coverage:.3f}); closing the thinking "
++                                                  "and continuing (reasoning_loop_recovery: close)", flush=True)
++                                            break
+                                         if self.reasoning_loop_recovery == "stop" or self.plain_prompt:
+                                             looped = True        # #728: end the reply here, as for a repeated token
+                                             break
+@@ -5857,7 +5874,7 @@ class Service:
+                         extra = self.tok.encode(text, parse_special=True)
+                         if max_new - n - len(extra) < 1:
+                             break                       # no room left to answer: "length", as without a budget
+-                        if wrap:
++                        if wrap and not loop_closed:
+                             print(f"[strata] thinking budget reached ({thought} tokens): wrapping up the thinking",
+                                   flush=True)
+                         for t in extra:
+@@ -9450,11 +9467,11 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+         if budget:
+             print(f"[strata] thinking budget: {budget} tokens (reasoning_budget_tokens; a request can set its own)",
+                   flush=True)
+-    recovery = cfg.get("reasoning_loop_recovery", False)   # #728: false (default) | "stop" | "recover" (true)
++    recovery = cfg.get("reasoning_loop_recovery", False)   # false (default) | "stop" | "recover" (true) | "close"
+     if recovery is True:
+         recovery = "recover"
+-    if recovery is not False and recovery not in ("stop", "recover"):
+-        raise SystemExit("[strata] config \"reasoning_loop_recovery\" must be false, \"stop\" or \"recover\", "
++    if recovery is not False and recovery not in ("stop", "recover", "close"):
++        raise SystemExit("[strata] config \"reasoning_loop_recovery\" must be false, \"stop\", \"recover\" or \"close\", "
+                          f"not {recovery!r}")
+     svc.reasoning_loop_recovery = recovery
+     svc.gpu_index = (gpu_list(cfg) or [0])[0]           # the Monitor reads the card the engine runs on (issue #51)
+diff --git a/serve/test_reasoning_loop_close.py b/serve/test_reasoning_loop_close.py
+new file mode 100644
+index 0000000..acc4c1f
+--- /dev/null
++++ b/serve/test_reasoning_loop_close.py
+@@ -0,0 +1,92 @@
++"""Bound repeated thinking while preserving the task, sampler and total output cap."""
++import threading
++import unittest
++from serve.server import Service, REASONING_WRAP_UP
++from serve.test_reasoning_loop_recovery import Tokenizer, RecordingEngine
++
++
++class ReasoningLoopClose(unittest.TestCase):
++    def setUp(self):
++        self.tok = Tokenizer()
++        self.ids = self.tok.encode('<|im_start|>user\nFix the import.<|im_end|>\n'
++                                   '<|im_start|>assistant\n<think>\n', parse_special=True)
++        self.loop = 'The import must remain correct for both compilation and execution. ' * 600
++
++    def run_case(self, script=None, cap=20000, thinking=True, mode='close', second='Fixed.'):
++        engine = RecordingEngine(self.tok, [script or self.loop, second])
++        svc = Service(engine, self.tok, None)
++        svc.answer_room = False
++        svc.reasoning_loop_recovery = mode
++        sampling = {'temperature': 0, 'seed': 42, 'top_p': .9}
++        events = list(svc.run(self.ids, thinking, [], cap, sampling, threading.Event()))
++        return engine, svc, events, sampling
++
++    def test_closes_without_system_effort_hint_and_keeps_prompt_and_sampler(self):
++        engine, svc, events, sampling = self.run_case()
++        self.assertEqual(len(engine.calls), 2)
++        self.assertEqual(engine.calls[1][0][:len(self.ids)], self.ids)
++        self.assertTrue(self.tok.decode(engine.calls[1][0]).endswith(REASONING_WRAP_UP))
++        self.assertEqual(engine.sampling_calls, [sampling, sampling])
++        content = ''.join(e.text or '' for kind, e in events if kind == 'event' and e.kind == 'content')
++        self.assertEqual(content, 'Fixed.')
++        self.assertEqual(events[-1][1]['finish'], 'stop')
++        self.assertEqual(events[-1][1]['reasoning_recoveries'], 1)
++        self.assertLess(events[-1][1]['completion_tokens'], 16000)
++        added = len(engine.calls[1][0]) - len(self.ids)
++        self.assertEqual(engine.calls[1][1], 20000-added)
++        self.assertEqual(svc.history[-1]['reasoning_recoveries'], 1)
++
++    def test_never_exceeds_shared_cap(self):
++        engine, _, events, _ = self.run_case(cap=16000, second='A useful answer. ' * 2000)
++        self.assertLessEqual(events[-1][1]['completion_tokens'], 16000)
++        self.assertEqual(len(engine.calls), 2)
++
++    def test_small_budget_does_not_restart_after_exhaustion(self):
++        engine, _, events, _ = self.run_case(cap=1000)
++        self.assertEqual(events[-1][1]['completion_tokens'], 1000)
++        self.assertEqual(len(engine.calls), 1)
++
++    def test_recovery_can_emit_a_tool_call(self):
++        engine = RecordingEngine(self.tok, [self.loop,
++            '<tool_call>\n<function=read>\n<parameter=path>index.ts</parameter>\n</function>\n</tool_call>'])
++        svc = Service(engine, self.tok, None)
++        svc.answer_room = False
++        svc.reasoning_loop_recovery = 'close'
++        tools = [{'name': 'read', 'parameters': {'type': 'object', 'properties': {'path': {'type': 'string'}}}}]
++        events = list(svc.run(self.ids, True, tools, 20000, {}, threading.Event()))
++        calls = [e for kind, e in events if kind == 'event' and e.kind == 'tool_call']
++        self.assertEqual(len(calls), 1)
++        self.assertEqual(calls[0].call.name, 'read')
++        self.assertEqual(events[-1][1]['reasoning_recoveries'], 1)
++
++    def test_cancellation_never_starts_a_second_generation(self):
++        engine = RecordingEngine(self.tok, [self.loop, 'Unused'])
++        svc = Service(engine, self.tok, None)
++        svc.reasoning_loop_recovery = 'close'
++        cancel = threading.Event()
++        events = []
++        for ev in svc.run(self.ids, True, [], 20000, {}, cancel):
++            events.append(ev)
++            if ev[0] == 'event': cancel.set()
++        self.assertEqual(len(engine.calls), 1)
++        self.assertEqual(events[-1][1]['finish'], 'cancel')
++
++    def test_useful_nonrepeating_thinking_is_unchanged(self):
++        text = ' '.join(str(i) for i in range(3000)) + '\n</think>\nDone.'
++        engine, _, events, _ = self.run_case(script=text)
++        self.assertEqual(len(engine.calls), 1)
++        self.assertEqual(events[-1][1]['reasoning_recoveries'], 0)
++
++    def test_repeated_visible_output_is_not_treated_as_thinking(self):
++        engine, _, events, _ = self.run_case(thinking=False)
++        self.assertEqual(len(engine.calls), 1)
++        self.assertEqual(events[-1][1]['reasoning_recoveries'], 0)
++
++    def test_disabled_remains_unchanged(self):
++        engine, _, events, _ = self.run_case(mode=False)
++        self.assertEqual(len(engine.calls), 1)
++        self.assertEqual(events[-1][1]['completion_tokens'], 20000)
++
++
++if __name__ == '__main__':
++    unittest.main()

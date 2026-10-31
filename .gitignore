@@ -95,3 +95,7 @@ node_modules/
 /build-spark/
 /build-vision-spark/
 /.venv-build/
+
+# RTX 2080 machine-local runtime, weights, credentials and retired artifacts
+/runtime/
+/.venv314
