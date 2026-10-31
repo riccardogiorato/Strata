@@ -7,7 +7,18 @@ rows=[json.loads(s) for s in (c.R/'results.jsonl').read_text().splitlines()] if 
 groups=defaultdict(list);checks={r['label']:r for r in rows if r['event'].endswith('_correctness')}
 for r in rows:
     if r['event']=='request':groups[(r['label'].split('-')[0],r.get('arm'),r.get('chunk'),r.get('route'),r.get('phase','edit'))].append(r)
-summary={'long':[], 'agent':[], 'speed':[], 'kernel':[r for r in rows if r['event']=='kernel_check']}
+summary={'long':[], 'agent':[], 'speed':[], 'host_load':[], 'kernel':[r for r in rows if r['event']=='kernel_check']}
+telemetry=[]
+for line in (c.R/'telemetry.jsonl').read_text().splitlines():
+    try:
+        r=json.loads(line);ticks=list(map(int,r['cpu'].split()[1:9]));telemetry.append((r['at'],sum(ticks),ticks[3]+ticks[4]))
+    except (ValueError,KeyError):pass
+telemetry.sort()
+for r in rows:
+    if r['event']!='request' or not r['label'].startswith('final-') or r.get('phase')!='cold':continue
+    samples=[x for x in telemetry if r['at']-r['wall_s']<=x[0]<=r['at']]
+    busy=[100*(1-(b[2]-a[2])/(b[1]-a[1])) for a,b in zip(samples,samples[1:]) if b[1]>a[1]]
+    summary['host_load'].append({'label':r['label'],'samples':len(busy),'mean_cpu_busy_pct':statistics.mean(busy) if busy else None,'peak_cpu_busy_pct':max(busy,default=None)})
 for key,rr in groups.items():
     t=[r['timings'] for r in rr];tokens=sum(x.get('prompt_n',0) for x in t);ms=sum(x.get('prompt_ms',0) for x in t)
     # HTTP prompt_n is unread tokens; independently retain usage to audit it.
