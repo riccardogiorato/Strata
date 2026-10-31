@@ -2,6 +2,8 @@
 import argparse, hashlib, json, re
 from pathlib import Path
 import campaign as c
+import metrics
+from collections import defaultdict
 
 p=argparse.ArgumentParser();p.add_argument('--output',type=Path,default=Path(__file__).with_name('results.json'));a=p.parse_args()
 s=json.loads((c.R/'summary.json').read_text());provenance=json.loads((c.R/'provenance.json').read_text())
@@ -53,4 +55,27 @@ for row in s['speed']:
         'chat':speed_stats(d['chat']['requests']),
         'prompts':{name:speed_stats(v['requests']) for name,v in d['prompts'].items()},
         'failure_count':len(d['failures']),'skipped':d['skipped']})
+boots={r['label']:r['arm'] for line in (c.R/'results.jsonl').read_text().splitlines() if (r:=json.loads(line))['event']=='boot'}
+groups=defaultdict(list)
+for suite in out['agents']:groups[(suite['kind'],boots[suite['label']])].append(suite)
+out['agent_comparison']=[]
+for (kind,arm),suites in groups.items():
+    native=[];http=[]
+    for suite in suites:
+        for path in sorted((c.R/'runs'/suite['label']).glob('*/result.json')):
+            result=json.loads(path.read_text());resume=path.parent.name.endswith('-followup')
+            for row in result['native']:
+                if resume:row['initial_request']=False
+                native.append(row)
+            for i,row in enumerate(result['http']):
+                row['initial_request']=i==0 and not resume;http.append(row)
+    out['agent_comparison'].append({'kind':kind,'arm':arm,'suites':len(suites),
+        'tasks_or_phases':sum(x['phases_or_tasks'] for x in suites),'passed':sum(x['passed'] for x in suites),
+        'native_metrics':metrics.aggregate(native),'client_cache':metrics.client_cache(http),
+        'wall_s':sum(x['wall_s'] for x in suites),
+        'api_output_tokens':sum(x.get('usage',{}).get('completion_tokens',0) for x in http),
+        'usage_reconciled':all(x['usage_reconciled'] for x in suites),
+        'internal_continuations':sum(x['internal_continuations'] for x in suites),
+        'api_minus_native_output_tokens':sum(x['api_minus_native_output_tokens'] for x in suites)})
+out['metric_scope']='native_metrics count actual engine segments and GPU-generated tokens; client_cache counts API requests and excludes internal continuations. API output can include injected closure text.'
 a.output.write_text(json.dumps(out,indent=2)+'\n');print(a.output)
