@@ -13,7 +13,7 @@ def main():
         for i,arm in enumerate(a.arms or ['off','on','on','off'],1):
             label=f'{a.prefix}-{i}-{arm}'
             if (c.R/(label+'.complete.json')).exists():continue
-            with c.server(label,arm,a.on_chunk if arm=='on' and a.on_chunk else a.chunk):
+            with c.server(label,arm,a.on_chunk if arm not in ('prod','off') and a.on_chunk else a.chunk):
                 if a.long:
                     # Keep compaction off for this explicit near-capacity engine test.
                     # Ordinary suites retain the harness defaults.

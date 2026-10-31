@@ -7,6 +7,13 @@ PYTHON=ROOT/'runtime/venv/bin/python'
 CANDIDATE=ROOT/'build/iq1m-current/strata'
 BASE=json.loads((R/'production-config.json').read_text())
 PORT=8087
+ARM_ENV={
+    'prod':{'STRATA_PF_FUSED_IQ1_M':'0'},
+    'off':{'STRATA_PF_FUSED_IQ1_M':'0'},
+    'on':{'STRATA_PF_FUSED_IQ1_M':'1'},
+    'legacy':{'STRATA_PF_FUSED_IQ1_M':'1','STRATA_PF_FUSED_LEGACY_LAYOUT':'1'},
+    'fp16':{'STRATA_PF_FUSED_IQ1_M':'0','STRATA_PF_WMMA':'1'},
+}
 
 def dump(path,data):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
@@ -29,7 +36,7 @@ def server(label,arm,chunk='4096',route='1.5',extra=None):
     check_gpu()
     cfg=copy.deepcopy(BASE);cfg.pop('vision',None)
     cfg.update(exe=str(ROOT/'runtime/bin/strata' if arm=='prod' else CANDIDATE),host='127.0.0.1',port=PORT,api_key='',log=str(R/(label+'.engine.log')))
-    cfg['env'].update(STRATA_PF_FUSED_IQ1_M='1' if arm=='on' else '0',STRATA_ROUTE_PRIOR=route)
+    cfg['env'].update(ARM_ENV[arm]);cfg['env']['STRATA_ROUTE_PRIOR']=route
     if chunk.startswith('auto:'):cfg['env']['STRATA_PREFILL_LEND_PCT']='100'
     cfg['env'].update(extra or {})
     cfg['args'][cfg['args'].index('--prefill')+1]=chunk
@@ -117,7 +124,7 @@ def main():
     for i,arm in enumerate(arms,1):
         label=f'{a.prefix}-{a.mode}-{i}-{arm}'
         if (R/(label+'.complete.json')).exists():continue
-        chunk=a.on_chunk if arm=='on' and a.on_chunk else a.chunk
+        chunk=a.on_chunk if arm not in ('prod','off') and a.on_chunk else a.chunk
         with server(label,arm,chunk,a.route):
             if a.mode=='edit':edit(label,arm=arm,chunk=chunk,route=a.route)
             elif a.mode=='needle':needle(label,arm=arm,chunk=chunk,route=a.route)
