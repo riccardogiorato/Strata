@@ -6687,7 +6687,7 @@ __global__ void __launch_bounds__(WG_THREADS) gemm_iq_f16_grouped_kernel(int ty,
     const int n0 = blockIdx.x * BN;
     const uint8_t* we = W + (size_t) e * expert_bytes;
     const int tid = threadIdx.x, warp = tid >> 5, lane = tid & 31;
-    const int wm = warp / (BN / 32), wn = warp % (BN / 32);                     // rows wm*32, cols wn*32 of an m-tile
+    const int wm = warp / (BN / 32), wn = warp % (BN / 32);   // rows wm*(MF*16), cols wn*32
     wmma::fragment<wmma::accumulator, 16, 16, 16, float> acc[WG_MT][MF][2];
 #pragma unroll
     for (int t = 0; t < WG_MT; ++t)
@@ -7039,25 +7039,25 @@ bool gemm_iq_f16_grouped(int ty, const void* W, size_t expert_bytes, int n_out, 
     // The original IQ tile uses 84,992 bytes, beyond Turing's 64 KiB opt-in limit.
     // A 64-weight-row tile uses 51,200 bytes and retains FP16 inputs/weights and FP32 accumulation.
     // Keep the 128-row tile on devices where it fits; Q2_0 and IQ4_NL-down already fit at 52,224 bytes.
-    struct TileSetup { bool done = false, ok = false, narrow = false; };
+    struct TileSetup { bool ok = false, narrow = false; };
     static TileSetup setup[64];
+    static std::once_flag setup_once[64];
     int dev = 0;
     if (cudaGetDevice(&dev) != cudaSuccess || dev < 0 || dev >= 64) return false;
     auto& cfg = setup[dev];
-    if (!cfg.done) {
-        cfg.done = true;
+    std::call_once(setup_once[dev], [&] {
         int limit = 0;
-        if (cudaDeviceGetAttribute(&limit, cudaDevAttrMaxSharedMemoryPerBlockOptin, dev) != cudaSuccess) return false;
+        if (cudaDeviceGetAttribute(&limit, cudaDevAttrMaxSharedMemoryPerBlockOptin, dev) != cudaSuccess) return;
         cfg.narrow = smem(256) > (size_t) limit;
         const size_t iq_bytes = smem(256, cfg.narrow ? 64 : WG_BN);
-        if (iq_bytes > (size_t) limit || smem(128) > (size_t) limit) return false;
+        if (iq_bytes > (size_t) limit || smem(128) > (size_t) limit) return;
         const auto iq_error = cfg.narrow
             ? cudaFuncSetAttribute(gemm_iq_f16_grouped_kernel<256, false, false, 64>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int) iq_bytes)
             : cudaFuncSetAttribute(gemm_iq_f16_grouped_kernel<256, false>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int) iq_bytes);
         cfg.ok = iq_error == cudaSuccess &&
                  cudaFuncSetAttribute(gemm_iq_f16_grouped_kernel<128, true>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int) smem(128)) == cudaSuccess &&
                  cudaFuncSetAttribute(gemm_iq_f16_grouped_kernel<128, false, true>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int) smem(128)) == cudaSuccess;
-    }
+    });
     if (!cfg.ok) return false;
     if (q20)
         gemm_iq_f16_grouped_kernel<128, true><<<grid, WG_THREADS, smem(128), s>>>(ty, (const uint8_t*) W, expert_bytes, row_bytes, K,
