@@ -39,7 +39,8 @@ int main(int argc, char** argv) {
     const k::QsaShapes s = k::qsa_real_shapes();
     const int64_t capacity = argc > 4 ? std::atoll(argv[4]) : 0;
     const int64_t max_blocks = capacity > 0 ? capacity / 4 + 2 : ctx / 4 + 1, cap = k::qsa_selection_width(k::kTopkMaxCells, s);
-    std::mt19937 rng(7);
+    const char* seed = std::getenv("QSA_BENCH_SEED");
+    std::mt19937 rng(seed ? (unsigned) std::strtoul(seed, nullptr, 10) : 7);
     std::normal_distribution<float> nd(0.f, 1.f);
     // keys with a shared direction plus noise, so the scores have a spread like a real indexer's
     std::vector<float> dir(128), pooled((size_t) (max_blocks * 128)), dead(128), q((size_t) (nq * 512));
@@ -132,6 +133,20 @@ int main(int argc, char** argv) {
     ck(cudaMemcpy(ib.data(), ids_new, ib.size() * 4, cudaMemcpyDeviceToHost), "down");
     std::vector<int32_t> ir(ia.size());
     ck(cudaMemcpy(ir.data(), ids_reg, ir.size() * 4, cudaMemcpyDeviceToHost), "down");
+    // Optional complete logical output for cross-process bitwise comparisons. Padding
+    // beyond n_bid / width is uninitialized and deliberately excluded.
+    if (const char* path = std::getenv("QSA_BENCH_DUMP")) {
+        FILE* f = std::fopen(path, "wb");
+        if (!f) { std::perror(path); return 2; }
+        bool ok = true;
+        for (int64_t i = 0; i < nq; ++i) {
+            const size_t ns = (size_t) steps[(size_t) (i * k::kStepCount + k::kStepNBid)] + 1;
+            const size_t ni = (size_t) steps[(size_t) (i * k::kStepCount + k::kStepWidth)];
+            ok = std::fwrite(a.data() + i * max_blocks, sizeof(float), ns, f) == ns && ok;
+            ok = std::fwrite(ir.data() + i * cap, sizeof(int32_t), ni, f) == ni && ok;
+        }
+        if (std::fclose(f) != 0 || !ok) { std::fprintf(stderr, "benchmark dump failed\n"); return 2; }
+    }
     int64_t reg_same = 0;
     for (int64_t i = 0; i < nq; ++i) {
         const int64_t w = steps[(size_t) (i * k::kStepCount + k::kStepWidth)];
