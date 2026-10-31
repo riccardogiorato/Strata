@@ -225,7 +225,8 @@ REASONING_CLOSE = "\n</think>\n\n"
 REASONING_WRAP_UP = "\n\nI have thought about this long enough; time to give my answer.\n</think>\n\n"
 # #728: opt-in handling of reasoning that repeats whole passages (which the single-token guard above cannot see).
 # "reasoning_loop_recovery": "stop" ends the reply there; "recover" (or true) goes on from the same output with the
-# low-effort instruction in place of the xhigh one.  Both off by default.
+# low-effort instruction in place of the xhigh one. "close" instead closes the detected looping thought and
+# continues to the answer/tool call, with the original prompt and sampler. All are off by default.
 HIGH_EFFORT = EFFORT_TEXT["xhigh"]
 LOW_EFFORT = EFFORT_TEXT["low"]
 LOOP_CHECK_EVERY = 512           # output tokens between two looks at the reasoning (at a clean parser boundary)
@@ -5547,6 +5548,7 @@ class Service:
         timings, before = None, None                    # this request's timings; the engine's `last` before it
         recovery_count, reasoning_text, repeat_coverage = 0, "", 0.0
         looped, next_loop_check = False, LOOP_CHECK_EVERY       # #728: reasoning that repeats whole passages
+        loop_closed = False                             # opt-in "close": reuse the bounded budget-wrap path
         raw_ids = []                                    # every generated id (STRATA_DEBUG: dump raw model text)
         emb, self.embeddings.path = getattr(self.embeddings, "path", None), None   # this run's to delete now
         img_keys, self.embeddings.keys = getattr(self.embeddings, "keys", None), None
@@ -5728,6 +5730,21 @@ class Service:
                                     next_loop_check = n + LOOP_CHECK_EVERY
                                     repeat_coverage = reasoning_repeat_coverage(reasoning_text)
                                     if repeat_coverage >= LOOP_COVERAGE:
+                                        if self.reasoning_loop_recovery == "close":
+                                            # Do not rewrite the system prompt or resample the request. The same
+                                            # token-preserving path as a reasoning budget leaves room for a tool
+                                            # call/answer; injected tokens count against the shared output cap.
+                                            wrap = loop_closed = True
+                                            recovery_count += 1
+                                            with self.status_lock:
+                                                st["reasoning_recoveries"] = recovery_count
+                                            if trace is not None:
+                                                trace["reasoning_recoveries"] = recovery_count
+                                                trace["reasoning_repeat_coverage"] = round(repeat_coverage, 3)
+                                            print(f"[strata] repeated reasoning detected at {n} tokens "
+                                                  f"(coverage={repeat_coverage:.3f}); closing the thinking "
+                                                  "and continuing (reasoning_loop_recovery: close)", flush=True)
+                                            break
                                         if self.reasoning_loop_recovery == "stop" or self.plain_prompt:
                                             looped = True        # #728: end the reply here, as for a repeated token
                                             break
@@ -5857,7 +5874,7 @@ class Service:
                         extra = self.tok.encode(text, parse_special=True)
                         if max_new - n - len(extra) < 1:
                             break                       # no room left to answer: "length", as without a budget
-                        if wrap:
+                        if wrap and not loop_closed:
                             print(f"[strata] thinking budget reached ({thought} tokens): wrapping up the thinking",
                                   flush=True)
                         for t in extra:
@@ -9450,11 +9467,11 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
         if budget:
             print(f"[strata] thinking budget: {budget} tokens (reasoning_budget_tokens; a request can set its own)",
                   flush=True)
-    recovery = cfg.get("reasoning_loop_recovery", False)   # #728: false (default) | "stop" | "recover" (true)
+    recovery = cfg.get("reasoning_loop_recovery", False)   # false (default) | "stop" | "recover" (true) | "close"
     if recovery is True:
         recovery = "recover"
-    if recovery is not False and recovery not in ("stop", "recover"):
-        raise SystemExit("[strata] config \"reasoning_loop_recovery\" must be false, \"stop\" or \"recover\", "
+    if recovery is not False and recovery not in ("stop", "recover", "close"):
+        raise SystemExit("[strata] config \"reasoning_loop_recovery\" must be false, \"stop\", \"recover\" or \"close\", "
                          f"not {recovery!r}")
     svc.reasoning_loop_recovery = recovery
     svc.gpu_index = (gpu_list(cfg) or [0])[0]           # the Monitor reads the card the engine runs on (issue #51)
