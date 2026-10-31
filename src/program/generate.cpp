@@ -783,6 +783,13 @@ struct Options {
     /// verify window (the window grows to at most 8).  Greedy verification keeps the output; its own counts are kept.
     int lookup_chain = 0;
     int lookup_chain_min = 3;   ///< --lookup-chain-min M: the shortest match (in tokens, drafts included) it extends on
+    /// --lookup-max-t N (opt-in, 0 = the --spec + 2 rule): prompt-lookup windows up to N tokens (<= kVerifyLongT) while
+    /// the MTP keeps its --spec windows.  A copy-heavy turn (an edit that rewrites a file) accepts nearly every lookup
+    /// draft, so its decode is bound by the window length.  Each window size is a graph of its own (~20-35 MiB of
+    /// VRAM), so only --lookup-sizes get one past the MTP's sizes; a size whose graph finds no VRAM is dropped.
+    int lookup_max_t = 0;
+    /// --lookup-sizes A,B,.. : the lookup window sizes above the MTP's (default with --lookup-max-t N: MTP+1, MTP+2, N)
+    std::string lookup_sizes;
     /// --mtp-hnorm stream (opt-in): the draft layer's pre_fc_norm_hidden normalizes each hyper-connection stream on
     /// its own (llama.cpp's qwen4exp MTP graph) instead of one RMS over all four (the default, tools/mtp_probe.py).
     bool mtp_hnorm_stream = false;
@@ -936,6 +943,9 @@ void usage() {
                  "  --suffix-draft N     prompt lookup: draft from an earlier repeat of the last N+ tokens of context\n"
                  "                       when it pays (default 3; 0 = MTP only)\n"
                  "  --mtp-max-t M        cap the MTP's windows at M tokens (0 = --spec; longer ones come from suffixes)\n"
+                 "  --lookup-max-t N     opt-in: prompt-lookup windows up to N (<= 16) tokens (the MTP keeps --spec); copy-heavy\n"
+                 "                       edits gain, each extra window size costs a graph (~20-35 MiB of VRAM)\n"
+                 "  --lookup-sizes A,B   the lookup window sizes past the MTP's (default: MTP+1, MTP+2 and N)\n"
                  "  --spec N             the MTP drafter's verify window: how many tokens it proposes per check (setup\n"
                  "                       writes 4; --suffix-draft lets it grow by 2, up to 8, where a repeat is likely)\n"
                  "  --spec-min-p P       how sure the draft layer must be to extend a verify window by another guess\n"
@@ -1079,6 +1089,36 @@ void usage() {
 }
 
 // --lookup-chain: the context's last tokens for the draft sources (at most 64), the MTP's pending drafts last
+// The window sizes the draft policy may give a lookup or chained window: every size up to --spec, unless
+// --lookup-max-t is on - then the MTP's own sizes and --lookup-sizes (default MTP+1, MTP+2 and --spec).
+unsigned lookup_size_mask(const Options& o) {
+    if (o.lookup_max_t <= 0) return ~0u;
+    const int s_mtp = o.mtp_max_t > 0 ? std::min(o.mtp_max_t, o.spec) : o.spec;
+    unsigned m = 0;
+    for (int t = 1; t <= s_mtp; ++t) m |= 1u << t;
+    if (o.lookup_sizes.empty()) {
+        for (int t : {s_mtp + 1, s_mtp + 2, o.spec})
+            if (t <= o.spec) m |= 1u << t;
+    } else {
+        size_t at = 0;
+        while (at < o.lookup_sizes.size()) {
+            const int t = std::atoi(o.lookup_sizes.c_str() + at);
+            if (t >= 2 && t <= o.spec) m |= 1u << t;
+            const size_t c = o.lookup_sizes.find(',', at);
+            if (c == std::string::npos) break;
+            at = c + 1;
+        }
+    }
+    return m;
+}
+
+std::string size_list(unsigned m, int max_t) {
+    std::string r;
+    for (int t = 1; t <= max_t; ++t)
+        if ((m >> t) & 1u) r += (r.empty() ? "" : ",") + std::to_string(t);
+    return r;
+}
+
 int chain_tail(const strata::spec::SuffixDrafter& sfx, const int32_t* pending, int n_pending, std::vector<int32_t>& tail) {
     const std::vector<int32_t>& h = sfx.history();
     const int keep = std::max(0, std::min((int) h.size(), 64 - n_pending));
@@ -2672,6 +2712,8 @@ int main(int argc, char** argv) {
         else if (a == "--pipeline-windows") o.pipeline_windows = std::max(0, std::min(2, std::atoi(next("--pipeline-windows"))));
         else if (a == "--suffix-draft") o.suffix_draft = std::max(0, std::atoi(next("--suffix-draft")));
         else if (a == "--mtp-max-t") o.mtp_max_t = std::max(0, std::atoi(next("--mtp-max-t")));
+        else if (a == "--lookup-max-t") o.lookup_max_t = std::max(0, std::atoi(next("--lookup-max-t")));
+        else if (a == "--lookup-sizes") o.lookup_sizes = next("--lookup-sizes");
         else if (a == "--lookup-chain") o.lookup_chain = std::clamp(std::atoi(next("--lookup-chain")), 0, 7);
         else if (a == "--lookup-chain-min") o.lookup_chain_min = std::max(3, std::atoi(next("--lookup-chain-min")));
         else if (a == "--mtp-hnorm") {
@@ -3265,6 +3307,11 @@ int main(int argc, char** argv) {
     if (o.suffix_draft > 0 && o.spec >= 2 && o.mtp_max_t == 0) {
         o.mtp_max_t = o.spec;
         o.spec = std::min(o.spec + 2, 8);   // kVerifyMaxT
+    }
+    // --lookup-max-t N (opt-in): lookup windows up to N tokens, the MTP's stay at --spec
+    if (o.lookup_max_t > 0 && o.suffix_draft > 0 && o.spec >= 2) {
+        if (o.mtp_max_t == 0) o.mtp_max_t = o.spec;
+        o.spec = std::max(o.spec, std::min(o.lookup_max_t, strata::kernels::kVerifyLongT));
     }
     // --lookup-chain (opt-in): the MTP keeps its windows; a lookup chained after its drafts may lengthen one by up to K.
     // Sized from the cap actually in force: the suffix block above may already have raised --spec to --spec+2, so sizing
@@ -5524,7 +5571,7 @@ int main(int argc, char** argv) {
         const strata::core::OnDevice on_mtp(last_st && !mtp_first ? last_st->dev : -1);
         // --pipeline-windows 2: 8 rows (the chain runs on past the window in flight: its drafts, its bonus token and
         // the next window's drafts), and the round/step graphs carry the forcing kernel
-        const int mtp_t = o.pipeline_windows >= 2 ? strata::kernels::kVerifyMaxT : o.spec;
+        const int mtp_t = o.pipeline_windows >= 2 ? strata::kernels::kVerifyMaxT : std::min(o.spec, strata::kernels::kVerifyMaxT);
         if (o.pipeline_windows >= 2) mtp.set_force_capture(true);
         if (!o.mtp.empty() && !mtp.load(o.mtp, draft_geometry, last_st && !mtp_first ? last_st->ss : ss, mtp_t, err,
                                         o.mtp_window, nullptr, prefill_mtp_loan)) {
@@ -9042,7 +9089,7 @@ int main(int argc, char** argv) {
         // the widest window; a request without penalties gets a null buffer and takes the byte-for-byte
         // neutral path (no upload, no buffer handed to the sampler).
         constexpr int kPenaltyWindowCap = 4096;
-        constexpr size_t kHistSlots = (size_t) kPenaltyWindowCap * (size_t) strata::kernels::kVerifyMaxT;
+        constexpr size_t kHistSlots = (size_t) kPenaltyWindowCap * (size_t) strata::kernels::kVerifyLongT;
         int32_t* d_hist = nullptr;
         std::vector<int32_t> hist_stage(kHistSlots, -1);
         const int hist_dev = last_st ? last_st->dev : -1;   // with the head: the last stage's device
@@ -9081,6 +9128,12 @@ int main(int argc, char** argv) {
         };
         auto pcie_num_of = [](double f) { return std::max(0, std::min(256, (int) (f * 256.0 + 0.5))); };
         const int n_stages = split_devs.empty() ? 1 : (int) split_at.size() + 1;
+        // a layer split's hand-off buffers (and its pipelined windows) hold kVerifyMaxT rows: --lookup-max-t stops there
+        if (n_stages > 1 && o.spec > strata::kernels::kVerifyMaxT) {
+            std::fprintf(stderr, "strata serve: --lookup-max-t %d: a layer split's windows stop at %d tokens\n",
+                         o.lookup_max_t, strata::kernels::kVerifyMaxT);
+            o.spec = strata::kernels::kVerifyMaxT;
+        }
         // --pipeline-windows (decided where the split was): two verifiers per stage, one for the even windows and one
         // for the odd ones, sharing one stream of their card, and a hand-off per parity - so stage 0 can run window
         // K+1 while stage 1 still reads window K's hand-off.  With more stages every stage but the last is a "front"
@@ -9566,10 +9619,44 @@ int main(int argc, char** argv) {
             id.config = *config_fp;
             return true;
         };
+        // STRATA_CKPT_PARK_REUSE=1 (opt-in, default off): a park moves checkpoint buffers it already holds instead of
+        // copying them (ConversationParkSource): those of the parked copies of this conversation it supersedes (the
+        // same capture: the same bytes), and - when a parked conversation is restored next, so the outgoing chain is
+        // dropped right after - the outgoing chain's own.  The parked image is the same; only the copies go.  Without
+        // it a park copies every checkpoint of the chain (~118 MB each for Swift 1.5): --prompt-cache N copies per park.
+        static const bool park_reuse = [] {
+            const char* v = std::getenv("STRATA_CKPT_PARK_REUSE");
+            return v != nullptr && std::atoi(v) == 1;
+        }();
+        // STRATA_CKPT_TIMING=1 (diagnostic, default off; prints only): one line per request with what its park and its
+        // checkpoints cost on the request's path - the park in its phases (dropping the superseded copies, the split,
+        // the capture, the merge and frees after it), the checkpoints captured and evicted during the read.
+        static const bool ckpt_timing = [] {
+            const char* v = std::getenv("STRATA_CKPT_TIMING");
+            return v != nullptr && std::atoi(v) == 1;
+        }();
+        struct CkptTiming {
+            int parks = 0, caps = 0, evicts = 0;
+            double park_ms = 0, drop_ms = 0, split_ms = 0, save_ms = 0, after_ms = 0, cap_ms = 0, evict_ms = 0;
+            size_t moved = 0, copied = 0, moved_bytes = 0, harvested = 0, snapshot_bytes = 0;
+        } ckt;
+        auto ms_since = [](Clock::time_point a) { return std::chrono::duration<double, std::milli>(Clock::now() - a).count(); };
+        if (park_reuse)
+            std::fprintf(stderr, "strata serve: STRATA_CKPT_PARK_REUSE=1: a park moves the checkpoint buffers it already "
+                                 "holds (superseded copies, an outgoing chain) instead of copying them\n");
         // Save only on a switch/rewind, not on each continuing request. No graph
         // addresses change: all parked images live in ordinary host vectors.
-        auto park_current_body = [&](size_t held) -> bool {
+        auto park_current_body = [&](size_t held, bool consume) -> bool {
             if (!conversations.enabled() || !live_ok || live.empty()) return true;
+            const auto tk0 = Clock::now();
+            struct ParkClock {   // STRATA_CKPT_TIMING: the whole park, whichever way it returns
+                bool on; CkptTiming& t; Clock::time_point t0;
+                ~ParkClock() {
+                    if (!on) return;
+                    ++t.parks;
+                    t.park_ms += std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+                }
+            } park_clock{ckpt_timing, ckt, tk0};
             // #2049: parking copies the outgoing conversation's running checkpoints and K/V into host memory, which
             // is a silent stretch of the "request" stage; when the OS has paged that memory out it takes minutes.
             // Named, so a stall report says "parking"; its copies beat (conversation_copy.hpp), so the watchdog
@@ -9590,9 +9677,15 @@ int main(int argc, char** argv) {
             }
             // #342: before make_room evicts oldest-first, the copies of this conversation a turn back go (they hold
             // nothing the outgoing chain does not, apart from the tail this conversation rewrote)
-            if (const size_t dropped = conversations.drop_superseded(live, live_imgs, checks, cvec_cached))
+            // STRATA_CKPT_PARK_REUSE: the dropped copies' checkpoints (ConversationParkSource::harvest); declared
+            // before the split's merge-back so they are freed after it
+            std::vector<ConvCheckpoint> harvest;
+            if (const size_t dropped = conversations.drop_superseded(live, live_imgs, checks, cvec_cached,
+                                                                     park_reuse ? &harvest : nullptr))
                 std::fprintf(stderr, "strata serve: conversation cache: dropped %zu superseded cop%s of this "
                              "conversation; parked=%zu\n", dropped, dropped == 1 ? "y" : "ies", conversations.size());
+            if (ckpt_timing) ckt.drop_ms += ms_since(tk0);
+            const auto tk1 = Clock::now();
             // A layer split parks one image per stage: the first stage's (with the draft layer's K/V) and one per
             // later stage (without it - the draft ring is saved once).  The checkpoints are MOVED apart into their
             // stage parts for the capture and put back together whichever way this ends (no running state copied).
@@ -9605,9 +9698,59 @@ int main(int argc, char** argv) {
             if (n_st > 0) cs = strata::core::conversation_checkpoints_split(std::move(checks), n_st);   // #752: two-phase; a bad_alloc leaves `checks` whole
             struct MergeBack {
                 strata::core::ConversationCheckpointSplit& cs; std::vector<ConvCheckpoint>& checks; bool on;
-                ~MergeBack() { if (on && !strata::core::conversation_checkpoints_merge(std::move(cs), checks)) checks.clear(); }
+                bool clear = false;   // STRATA_CKPT_PARK_REUSE consumed the chain's buffers: it goes (a restore follows)
+                bool timing = false; double* after_ms = nullptr;
+                ~MergeBack() {
+                    const auto t0 = Clock::now();
+                    if (on && !strata::core::conversation_checkpoints_merge(std::move(cs), checks)) checks.clear();
+                    if (clear) checks.clear();
+                    if (timing) *after_ms += std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+                }
             } merge_back{cs, checks, n_st > 0};
-            const strata::core::ConversationView view{live, live_imgs, n_st > 0 ? cs.stage0 : checks, cvec_cached};
+            merge_back.timing = ckpt_timing;
+            merge_back.after_ms = &ckt.after_ms;
+            std::vector<ConvCheckpoint>& view0 = n_st > 0 ? cs.stage0 : checks;
+            const strata::core::ConversationView view{live, live_imgs, view0, cvec_cached};
+            if (ckpt_timing) ckt.split_ms += ms_since(tk1);
+            // STRATA_CKPT_PARK_REUSE: keep only the harvested checkpoints a view still holds (the same capture); the
+            // others are freed now, as without the switch.  Their bytes - and, when the chain is consumed, the chain's
+            // own - are not allocated again, so the RAM admission below asks for that much less.
+            size_t reuse_bytes = 0;
+            auto state_bytes = [](const ConvCheckpoint& c) {   // (conversation_detail::checkpoint_state_bytes)
+                return c.gdn.capacity() + c.ple.capacity() + c.tails.capacity() + c.dead.capacity() + c.block_pos.capacity();
+            };
+            if (park_reuse) {
+                std::vector<uint64_t> held_caps;
+                auto note = [&](const std::vector<ConvCheckpoint>& v) {
+                    for (const ConvCheckpoint& c : v) if (c.capture != 0) held_caps.push_back(c.capture);
+                };
+                note(view0);
+                for (size_t k = 0; k < n_st; ++k) note(cs.parts[k]);
+                harvest.erase(std::remove_if(harvest.begin(), harvest.end(), [&](const ConvCheckpoint& h) {
+                                  return h.capture == 0 || std::find(held_caps.begin(), held_caps.end(), h.capture) ==
+                                                               held_caps.end();
+                              }), harvest.end());
+                for (const ConvCheckpoint& h : harvest) reuse_bytes += state_bytes(h);
+                if (consume) {
+                    reuse_bytes = 0;   // every view checkpoint is moved, harvested or consumed
+                    auto all = [&](const std::vector<ConvCheckpoint>& v) {
+                        for (const ConvCheckpoint& c : v) reuse_bytes += state_bytes(c);
+                    };
+                    all(view0);
+                    for (size_t k = 0; k < n_st; ++k) all(cs.parts[k]);
+                }
+                if (ckpt_timing) ckt.harvested += harvest.size();
+            }
+            strata::core::ConversationParkSource src0;
+            std::vector<strata::core::ConversationParkSource> src_k(n_st);
+            if (park_reuse) {
+                src0.harvest = &harvest;
+                src0.consume = consume ? &view0 : nullptr;
+                for (size_t k = 0; k < n_st; ++k) {
+                    src_k[k].harvest = &harvest;
+                    src_k[k].consume = consume ? &cs.parts[k] : nullptr;
+                }
+            }
             auto reuse = conversations.take_reuse();
             std::vector<strata::core::ConversationKvReuse> stage_reuse = std::move(reuse.stages);
             stage_reuse.resize(n_st);
@@ -9666,7 +9809,7 @@ int main(int argc, char** argv) {
             const auto t0 = Clock::now();
             try {
                 const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib * 1024 * 1024;
-                const size_t retained = reuse.bytes() + stage_retained;
+                const size_t retained = reuse.bytes() + stage_retained + reuse_bytes;   // (reuse_bytes: 0 without the switch)
                 const size_t additional = estimate > retained ? estimate - retained : 0;
                 // The physical-RAM gate: the incoming snapshot has to fit beside the floor.  make_room()
                 // above only balanced the cache's own budget, so a full cache leaves this one short even
@@ -9700,8 +9843,9 @@ int main(int argc, char** argv) {
                                  (long long) o.conversation_cache_min_free_mib);
                 strata::core::SavedConversation image;
                 size_t reused_bytes = 0;
+                if (park_reuse && consume) merge_back.clear = true;   // from here on the chain's buffers may move
                 if (!strata::core::conversation_snapshot_save(image, view, ss, g, draft0, err,
-                        std::move(reuse), &reused_bytes)) return false;
+                        std::move(reuse), &reused_bytes, park_reuse ? &src0 : nullptr)) return false;
                 for (size_t k = 0; k < n_st; ++k) {   // the later stages (the last one with the draft layer's K/V)
                     auto& st = stages[k];
                     const strata::core::OnDevice on(st->dev);
@@ -9709,9 +9853,15 @@ int main(int argc, char** argv) {
                     const strata::core::ConversationView view_k{live, live_imgs, cs.parts[k], cvec_cached};
                     strata::core::SavedConversation part;
                     if (!strata::core::conversation_snapshot_save(part, view_k, st->ss, g, draft_of(k), err,
-                            std::move(stage_reuse[k]), &reused_bytes))
+                            std::move(stage_reuse[k]), &reused_bytes, park_reuse ? &src_k[k] : nullptr))
                         return false;
                     image.stage_images.push_back(std::move(part));
+                }
+                if (ckpt_timing) {
+                    ckt.save_ms += ms_since(t0);
+                    ckt.snapshot_bytes = image.bytes();
+                    for (const auto* s : {&src0}) { ckt.moved += s->moved; ckt.moved_bytes += s->moved_bytes; ckt.copied += s->copied; }
+                    for (const auto& s : src_k) { ckt.moved += s.moved; ckt.moved_bytes += s.moved_bytes; ckt.copied += s.copied; }
                 }
                 const auto mem_after = strata::core::sample_host_memory();
                 if (!strata::core::conversation_memory_admit(
@@ -9735,8 +9885,8 @@ int main(int argc, char** argv) {
         };
         // #752: the whole park (the checkpoint split included) is under one try, so a host OOM skips parking instead of
         // ending the server
-        auto park_current = [&](size_t held) -> bool {
-            try { return park_current_body(held); }
+        auto park_current = [&](size_t held, bool consume = false) -> bool {
+            try { return park_current_body(held, consume); }
             catch (const std::bad_alloc&) {
                 std::fprintf(stderr, "strata serve: conversation cache: allocation failed; skip parking\n");
                 return true;
@@ -9802,6 +9952,10 @@ int main(int argc, char** argv) {
         auto checkpoint_at = [&](int64_t L, std::vector<ConvCheckpoint>* parts = nullptr, bool as_tail = false) -> bool {
             ckpt_why.clear();
             if (o.prompt_cache <= 0 || L < 1) return true;
+            struct CapClock {   // STRATA_CKPT_TIMING
+                bool on; CkptTiming& t; Clock::time_point t0 = Clock::now();
+                ~CapClock() { if (on) t.cap_ms += std::chrono::duration<double, std::milli>(Clock::now() - t0).count(); }
+            } cap_clock{ckpt_timing, ckt};
             for (ConvCheckpoint& c : checks)
                 if ((int64_t) c.ids.size() == L) {
                     c.used = ++check_clock;
@@ -9813,6 +9967,7 @@ int main(int argc, char** argv) {
             c.imgs = imgs_below(req_imgs, L);
             if (parts != nullptr) {
                 if (parts->size() != stages.size() + 1) return false;
+                c.capture = (*parts)[0].capture;   // (its bytes, moved: the same identity)
                 c.gdn = std::move((*parts)[0].gdn);
                 c.ple = std::move((*parts)[0].ple);
                 c.tails = std::move((*parts)[0].tails);
@@ -9955,6 +10110,11 @@ int main(int argc, char** argv) {
                                                                    tail_flags.get(), pin_flags.get());
                 ckpt_pool.give(std::move(checks[victim]));   // (STRATA_CKPT_POOL; else nothing)
                 checks.erase(checks.begin() + (std::ptrdiff_t) victim);
+            }
+            if (ckpt_timing) {
+                ++ckt.caps;
+                ckt.evicts += (int) (before_evict - checks.size());
+                ckt.evict_ms += std::chrono::duration<double, std::milli>(Clock::now() - te0).count();
             }
             if (ckpt_trace && checks.size() < before_evict) {
                 const double ms = std::chrono::duration<double, std::milli>(Clock::now() - te0).count();
@@ -11287,6 +11447,28 @@ int main(int argc, char** argv) {
                 chain_rows = chain_st.best_rows;
                 return k;
             });
+        policy.set_sizes(lookup_size_mask(o));
+        // a layer split's hand-off buffers hold kVerifyMaxT rows: its windows stay at that
+        if (n_stages > 1) policy.set_sizes(policy.sizes() & ((2u << strata::kernels::kVerifyMaxT) - 1u));
+        if (o.lookup_max_t > 0)
+            std::fprintf(stderr, "strata serve: --lookup-max-t %d: MTP windows up to %d tokens, window sizes %s\n",
+                         o.lookup_max_t, S_mtp, size_list(policy.sizes(), S).c_str());
+        // --lookup-max-t: a lookup window's graph is captured before its round; a size whose graph finds no VRAM is
+        // dropped for good (the policy never picks it again) and the round takes the next smaller allowed size.
+        // -1: a capture failed for another reason (err says why).
+        auto graph_fits = [&](int t) -> int {
+            while (t > 1) {
+                bool no_vram = false;
+                if (ver.prepare(t, no_vram, err)) return t;
+                if (!no_vram) return -1;
+                policy.disable(t);
+                std::fprintf(stderr, "strata serve: no VRAM for the %d-token window graph: that size is dropped, "
+                                     "sizes left %s (a larger --vram-reserve-mib keeps it)\n", t,
+                             size_list(policy.sizes(), S).c_str());
+                t = policy.fit(t - 1);
+            }
+            return 1;
+        };
         // The vision path (--vision): GENI <max_new> <embeddings file> <id,id,...> carries images.  The file is one
         // or more strata-vision records (int32 'SVE1', n, nx, ny, n_embd, then n x n_embd floats) in prompt order;
         // each image's rows go to its run of <|image_pad|> tokens, whose M-RoPE positions are mtmd's: t = p,
@@ -12642,6 +12824,7 @@ int main(int argc, char** argv) {
             }
             cur = ids;
             const Clock::time_point r0 = Clock::now();
+            ckt = CkptTiming{};
             const int64_t streamed0 = sp.chain_experts_streamed();   // the DONE line's experts_streamed= is the difference
             // ---- where this request starts reading: the live session, or a checkpoint, whose tokens AND pictures are
             // exactly the start of this prompt - at most n - 1 of them, the last token is always the first window
@@ -12964,7 +13147,7 @@ int main(int argc, char** argv) {
                                     (int64_t) live.size() >= (int64_t) park_held + o.conversation_cache_park_gain;
             if (borrow && !pin_sibling && park_worth) {
                 conversations.guard(parked.serial);   // parking the outgoing conversation must not evict the donor
-                const bool parked_ok = park_current(0);
+                const bool parked_ok = park_current(0, true);   // the borrow replaces `checks` (or the take below does)
                 const bool blocked = conversations.guard_blocked();
                 conversations.unguard();
                 if (!parked_ok) {
@@ -12979,13 +13162,13 @@ int main(int argc, char** argv) {
                     borrow = false;
                     if (const size_t at = conversations.index_of(parked.serial); at != SIZE_MAX)
                         incoming.emplace(conversations.take(at));
-                    if (!park_current(incoming ? incoming->bytes() : 0)) {
+                    if (!park_current(incoming ? incoming->bytes() : 0, incoming.has_value())) {
                         std::printf("ERR %s\n", err.c_str());
                         return 1;
                     }
                 }
             } else if ((!from_live || incoming || slot_source >= 0) && !pin_sibling && park_worth &&
-                       !park_current(incoming ? incoming->bytes() : 0)) {
+                       !park_current(incoming ? incoming->bytes() : 0, incoming.has_value())) {
                 std::printf("ERR %s\n", err.c_str());
                 return 1;
             }
@@ -13424,7 +13607,13 @@ int main(int argc, char** argv) {
                 for (int64_t q = a; q < b;) {
                     if (stop_req.load()) { e = "cancelled"; return false; }
                     pp_exact = false;   // until this window and the drafter's rows are in
-                    const int T = (int) std::min<int64_t>(S, b - q);
+                    int T = (int) std::min<int64_t>(S, b - q);
+                    // --lookup-max-t: the prompt's windows take the allowed sizes too (each size is a graph of its own);
+                    // one whose graph finds no VRAM is dropped as in decode
+                    if (o.lookup_max_t > 0) {
+                        T = graph_fits(policy.fit(T));
+                        if (T < 0) { e = err; return false; }
+                    }
                     for (int t = 0; t < T; ++t) {
                         win[(size_t) t] = (int32_t) cur[(size_t) (q + t)];
                         nxt[(size_t) t] = (int32_t) cur[(size_t) (q + t + 1)];
@@ -15193,6 +15382,11 @@ int main(int argc, char** argv) {
                     if (k > 0 && (!use_mtp || sbuf[0] == drafts[0])) {
                         const strata::spec::DraftPolicy::Pick pk = policy.choose(T, k, sfx_match);
                         if (pk.lookup) { T = pk.t; from_sfx = true; }
+                        if (pk.lookup && o.lookup_max_t > 0) {
+                            const int t = graph_fits(T);
+                            if (t < 0) { std::printf("ERR %s\n", err.c_str()); return 1; }
+                            T = t;
+                        }
                     }
                 }
                 // --lookup-chain: what followed an earlier occurrence of the context + the MTP's drafts, after them
@@ -15208,6 +15402,11 @@ int main(int argc, char** argv) {
                         double p_mtp = 1.0;
                         for (int i = 0; i < T - 1; ++i) p_mtp *= dprob[(size_t) i];
                         chain_n = policy.chain(T, p_mtp, chain_n, cm);
+                    }
+                    if (chain_n > 0 && o.lookup_max_t > 0) {
+                        const int t = graph_fits(T + chain_n);
+                        if (t < 0) { std::printf("ERR %s\n", err.c_str()); return 1; }
+                        chain_n = std::max(0, t - T);
                     }
                 }
                 const int T_mtp = T;
@@ -15460,7 +15659,7 @@ int main(int argc, char** argv) {
                 if (use_mtp && hist_n > 0 && mtp.coupled() && !eos && produced_n < max_new)
                     mtp.set_draft_history(consumed.data(), (int64_t) consumed.size(), outv[(size_t) a]);
                 const bool drafted = !use_mtp || eos || produced_n >= max_new ||
-                                     mtp.draft(T, outv.data(), p, a, drafts.data(), err, dprob.data(), (float) req_spec_min_p);
+                                     mtp.draft_long(T, outv.data(), p, a, drafts.data(), err, dprob.data(), (float) req_spec_min_p);
                 {
                     const Clock::time_point tw3 = Clock::now();
                     auto msd = [](Clock::time_point a0, Clock::time_point b0) { return std::chrono::duration<double, std::milli>(b0 - a0).count(); };
@@ -15793,6 +15992,17 @@ int main(int argc, char** argv) {
                          prompt_ms > 0 ? 1000.0 * read_n / prompt_ms : 0.0, (long long) produced_n, decode_ms,
                          decode_ms > 0 ? 1000.0 * produced_n / decode_ms : 0.0, (long long) draft_accepted,
                          (long long) draft_offered, checks.size(), cancelled ? " (cancelled)" : "");
+            if (ckpt_timing) {
+                size_t chain_bytes = 0;
+                for (const ConvCheckpoint& c : checks) chain_bytes += c.bytes();
+                std::fprintf(stderr, "strata ckpt timing: park %d in %.1f ms (drop %.1f, split %.1f, capture %.1f, merge+free "
+                                     "%.1f; %zu moved %.0f MiB, %zu copied, %zu harvested; image %.0f MiB); %d checkpoint(s) "
+                                     "%.1f ms, evict %d in %.1f ms; chain %zu = %.0f MiB\n",
+                             ckt.parks, ckt.park_ms, ckt.drop_ms, ckt.split_ms, ckt.save_ms, ckt.after_ms, ckt.moved,
+                             (double) ckt.moved_bytes / 1048576.0, ckt.copied, ckt.harvested,
+                             (double) ckt.snapshot_bytes / 1048576.0, ckt.caps, ckt.cap_ms, ckt.evicts, ckt.evict_ms,
+                             checks.size(), (double) chain_bytes / 1048576.0);
+            }
             if (serve_adapt_drain_ms >= 1.0)
                 std::fprintf(stderr, "strata serve: the request first waited %.0f ms for the adaptive tier's round in flight\n",
                              serve_adapt_drain_ms);
@@ -16745,6 +16955,7 @@ int main(int argc, char** argv) {
                 chain_rows = chain_st.best_rows;
                 return k;
             });
+        policy.set_sizes(lookup_size_mask(o));
         std::vector<int32_t> sbuf((size_t) o.spec, 0);
         int64_t sfx_windows = 0, sfx_drafts = 0, sfx_ok = 0;
         int64_t chain_windows = 0, chain_drafts = 0, chain_ok = 0;   // --lookup-chain's own counts
@@ -16820,7 +17031,7 @@ int main(int argc, char** argv) {
                 return true;
             }
 #endif
-            return mtp.draft(T_, outv.data(), p, a_, drafts.data(), err, dprob.data(), (float) o.spec_min_p);
+            return mtp.draft_long(T_, outv.data(), p, a_, drafts.data(), err, dprob.data(), (float) o.spec_min_p);
         };
         int win_cap = o.spec;   // the widest window the VRAM allows (lowered on an out-of-memory capture, see below)
         while ((int64_t) produced.size() < max_new) {
