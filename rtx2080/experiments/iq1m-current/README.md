@@ -54,3 +54,9 @@ runtime/venv/bin/python rtx2080/experiments/iq1m-current/export.py
 ```
 
 The final driver checks that the production binary, profile, source record and expert-profile seed remain unchanged, and that the candidate binary does not change during validation. It runs each arm in a fresh engine, with a copied expert-profile seed and a quiet-host check before each stage. Completed arm labels are skipped on restart; use new prefixes for intentional repeats. Near-capacity follow-up requests count as continuations in the aggregate cache metrics, including the first request after resuming the Pi session. Their file checks are separate from the ordinary ten-task verifier.
+
+## Scope of the possible gain
+
+The historical 590 → 886 tok/s improvement came from the existing fused-prefill / batch / VRAM-loan bundle on the Swift weights. It did not come from this IQ1_M adapter. Forty-five of the model's 48 layers already use the existing fused native-IQ path for large prompt chunks; this investigation primarily targets the three IQ1_M fallback layers. An isolated kernel improvement therefore cannot be applied as the same percentage to whole-model prefill.
+
+The repaired FP16 path dequantizes compressed weights into shared-memory tiles and multiplies FP16 activations with FP32 accumulation. It extends Strata's existing Volta implementation to the 2080's shared-memory limit. This follows the tiled, on-the-fly dequantization direction investigated from TensorFold, but contains no copied TensorFold code. The existing `STRATA_PF_WMMA` switch is broader than IQ1_M: on smaller non-fused prompt chunks it can also select FP16 grouped multiplication for other supported formats. Short-prompt and cached-agent checks are needed for that reason.
