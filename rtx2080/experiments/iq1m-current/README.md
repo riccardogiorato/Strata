@@ -1,78 +1,79 @@
-# IQ1_M on the current RTX 2080 configuration
+# IQ1_M prefill on the RTX 2080: final results
 
-This campaign integrates the opt-in IQ1_M/Q2_0 adapter from PR #4642 into the October 31 `rtx2080` profile, based on Strata 0.2.9 / engine 0.1.55. The production binary remains unchanged until a candidate passes both performance and correctness checks.
+**Completed November 1, 2026. Selected for production: IQ1_M INT8 fusion with the old buffer layout.** Same-day paired 121K prefill improved **850.6 → 866.2 tok/s (+1.8%)**, saving about 2.6 seconds per cold prompt. Both arms passed 20/20 scored coding attempts and 4/4 near-capacity checks. Decode remained approximately unchanged. This is a small additional gain on the already tuned profile.
 
-The adapter extends Strata's existing compressed-weight int8 fused prefill. TensorFold's tiled quantized prefill and expert-stage memory sizing inspired the investigation; no TensorFold kernel was copied. It covers the three remaining IQ1_M layers in our mixed Swift IQ2_XS weights, and enables the existing fully fused buffer layout when all layers qualify.
+[Compact measurements and checks](results.json) include every screened candidate, failures, native token/time counters, cache metrics and executable hashes. Raw prompts, replies, credentials and machine assets remain in ignored `runtime/iq1m-20261031/`.
 
-## Protocol
+## Enabled configuration
 
-- RTX 2080 8GB at 165W; same Swift weights and immutable expert-profile seed per fresh process.
-- 131,072 context capacity, 32,768 resident INT8 KV, routing prior 1.5, spec4, existing production prefill loans and other settings.
-- Compare the installed production binary, the integrated binary with the new flag off, and that same binary with the flag on.
-- Fixed-4K cold-edit sequence: production / off / on / on / off / production. The fixture has 122,451 input tokens, temperature zero, seed 1234, thinking off. Score AST equivalence of the entire requested edit; retain failed outputs.
-- A separate 121K retrieval fixture has cold and reused-prefix requests. The usual speed suite covers chat and shorter prompts too.
-- Test auto chunk sizing separately, recording the actual selected chunk rather than the requested ceiling.
-- Pi agent tasks use thinking enabled at the API, unchanged tool schemas, isolated workspaces and sandboxed independent verification. Record tokens/time, expert-cache hit counts, prefix reuse and scores. Ordinary suites retain compaction; explicit near-capacity tool tests disable compaction so the model actually sees the large prompt.
-- Kernel checks include independent numerical reference, opt-out checks, 4K/4.5K/8K routed batches, CUDA memcheck and the existing IQ2_S/IQ2_XXS paths.
+Strata 0.2.9 / engine 0.1.55, RTX 2080 8GB / SM75 / 165W, i5-9600K, 64GB RAM. Same Swift 1.5 Qwen3.8 Flash-Next GSQ-RCO IQ2_XS 125B weights and NVMe placement throughout. Context capacity stays **131,072**, with 32,768 resident INT8 KV tokens, routing prior 1.5, spec4, prefill chunk 4,096, existing VRAM loans and hot session restore.
 
-Scripts live here; raw inputs, outputs and configs stay under ignored `runtime/iq1m-20261031/`. `campaign.py` consumes a resolved production config and the archived edit/retrieval fixtures there. `harness.py` adapts our previously pinned Pi/fx benchmark harness; tasks and local harness executables come from the existing `local-ai-rtx2080` benchmark workspace. The shared proxy explicitly enables thinking despite Pi's local reasoning metadata.
+Add to the existing profile:
 
-## Implementation findings (validation still in progress)
+```text
+STRATA_PF_FUSED_IQ1_M=1
+STRATA_PF_FUSED_LEGACY_LAYOUT=1
+STRATA_PF_WMMA=0
+```
 
-- The integrated INT8 adapter passes numerical tests, opt-out checks and CUDA memcheck. All 46 existing fused device functions retain identical assembly; one IQ1_M function is added.
-- In the first 122K series, installed production averaged 858.1 tok/s (2/2 exact edits), the rebuilt feature-off control 852.3 (2/2), and feature-on 881.2 (1/2). A rendering job overlapped portions of the series; final performance claims need clean confirmation. All outputs had 1,433 tokens. The failed edit missed two literal replacements.
-- `STRATA_PF_FUSED_LEGACY_LAYOUT=1` is a diagnostic added here: keep the old ring/buffer plan while using supported fused kernels. Two runs at 877.7 and 873.3 tok/s passed both edits. This does not establish general quality equivalence.
-- The existing FP16 grouped path (`STRATA_PF_WMMA=1`) failed to launch IQ tiles on the RTX 2080: its 84,992-byte shared-memory tile exceeds the 65,536-byte device limit. This campaign adds a 64-weight-row / 8-warp tile using 51,200 bytes, retaining FP16 weights/activations and FP32 sums. Devices where the original tile fits retain it; the already-fitting Q2_0/IQ4_NL-down tiles retain their shapes. Device attributes are initialized once per device.
-- Before that fix, the existing WMMA parity test failed to launch six of eight cases; afterwards all eight pass. CUDA memcheck reports zero errors. The first full-model FP16 run passed the edit at 875.9 tok/s.
+The adapter from [PR #4642](https://github.com/Niko1221/Strata/pull/4642) covers the three IQ1_M/Q2_0 fallback layers (8, 13, 37) in these mixed weights. Forty-five layers already used fused native-IQ prefill. The new layout override keeps the previous ring/buffer allocation while enabling the additional kernel. Quantized weights are preserved, but INT8 activation/intermediate rounding changes outputs: this is not a bitwise-equivalent transformation.
 
-No production settings have changed. Chunk tuning, matched final controls and full agentic validation remain to be completed. The FP16 tile fix is an extension of upstream Strata's Volta kernel, separate from PR #4642's INT8 adapter. Neither is copied TensorFold code.
+## Throughput and correctness
 
-### Additional tuning screens
+Rates aggregate tokens divided by native time, rather than averaging request rates or comparing total task duration.
 
-Automatic prefill (`auto:8192`, lend 100%) selected 4,352 tokens for FP16 and 4,608 for compact INT8. At 122,451 input tokens, FP16 measured 870.0 tok/s, FP16 with upstream embedding reuse accounting 860.1, INT8 with legacy layout 864.4, and compact INT8 888.3. All four exact edits passed. These are single screening runs, not paired final claims; the compact path's earlier failure remains part of its record.
+| Workload | Previous production | Selected configuration | Change |
+|---|---:|---:|---:|
+| 121,016-token cold prefill | 850.61 | 866.22 | +1.84% |
+| 32K prefill | 881.31 | 889.17 | +0.89% |
+| 16K prefill | 866.48 | 874.93 | +0.98% |
+| 4K prefill | 657.85 | 658.55 | +0.11% |
+| Short chat decode | 57.44 | 57.09 | −0.61% |
+| Scored coding decode | 62.00 | 62.16 | +0.26% |
 
-An opt-in `STRATA_PF_WMMA_NT=512` variant doubles the narrow tile's warps while retaining its 51,200-byte shared allocation and FP16 arithmetic. In the synthetic 693-row / seven-expert reference fixture, IQ1_M decreased from 0.4838 to 0.4169 ms per call (100 GPU-timed calls). Both thread layouts passed all eight numerical cases, including finite-output checks. This is a kernel microbenchmark, not an end-to-end speedup claim. Full-model and agent checks determine promotion.
+The final 121K sequence used fresh engines in production/candidate/candidate/production order: production 853.5 and 847.8 tok/s, candidate 867.3 and 865.1. All cold and warm retrieval answers passed. Warm calls each reused 121,009 tokens; first-token times were 1.113/1.086 seconds on production and 1.252/1.005 on the candidate. There is no established warm-latency win. The standard speed suite used three repeats per case, with no failures or skipped cases.
 
-### Original 121K fixture: final cold/warm comparison
+| Coding validation | Previous production | Selected configuration |
+|---|---:|---:|
+| Scored attempts (same 10 tasks, twice) | 20/20 | 20/20 |
+| Native generated tokens | 60,902 | 55,150 |
+| Aggregate prefill tok/s on agent requests | 334.37 | 357.28 |
+| Expert-pool cache hits | 80.47% | 80.60% |
+| Resident share of all routed experts | 75.69% | 75.86% |
+| Continuation prefix tokens reused | 92.90% | 91.65% |
+| Continuation requests with a cache hit | 100% | 100% |
+| Near-capacity independent file checks | 4/4 | 4/4 |
+| Largest near-capacity prompt | 121,831 | 122,359 |
+| Near-capacity continuation prefix reuse | 99.756% | 99.814% |
 
-The fresh-process order was production / FP16-512 / FP16-512 / production. Production read 121,016 tokens at 854.6 and 847.6 tok/s; the candidate at 860.1 and 857.4. Token/time aggregation gives 851.1 versus 858.7 tok/s (+0.9%). All four cold and all four warm retrieval answers passed. Mean host CPU use during these cold requests was around 18%, with no heavy rendering overlap observed in the telemetry.
+Scored suites ran production/candidate/candidate/production, with thinking enabled at the API, pinned Pi 1.4.0, fresh sandboxed workspaces and independent verifiers. Ordinary tasks reached up to ~16K; separate sessions started with 117,214 tokens and exercised retrieval, file edits, tools and resumed conversations near capacity, with compaction disabled. Near-capacity controls were collected earlier in the same campaign, not interleaved with the final candidate. The candidate also passed three 122,451-token exact-edit screens across fixed/automatic chunk sizes.
 
-Every warm request reused 121,009 tokens (seven unread). Production warm first-token times were 1.056 and 0.938 seconds, versus 1.149 and 1.138 for the candidate. Treat those as cache/restore latency, not bulk prefill rates. Output lengths were 14–19 tokens, too short to use as a decode-performance claim. This is a small prefill gain and does not by itself justify promotion; coding-agent and usual speed checks are still in progress.
+Generated text and tool paths differ, so agent prefill/decode rates are workload observations, not isolated kernel comparisons. The candidate's shorter total task time partly reflects fewer output tokens. Twenty attempts repeat ten tasks; this is a limited quality sample.
 
-## Reproduction on this prepared workspace
+## Alternatives retained but disabled
 
-Use `runtime/venv/bin/python` and the fixture/config preparation described above. All commands below retain production assets; stop the production service before allocating the GPU.
+- **Compact INT8 buffer layout:** 881.2 tok/s in the initial fixed-chunk screen, but only 1/2 exact edits passed (two literal replacements missed). A later automatic-chunk run reached 888.3 and passed; that does not erase the failure. Initial screening also had some rendering overlap, so its speed is not the final paired claim.
+- **FP16 grouped WMMA:** repaired the existing IQ tile that exceeded Turing's 64KiB shared-memory limit. A 64-row tile uses 51,200 bytes; an opt-in 512-thread variant reduced one IQ1_M microbenchmark from 0.4838 to 0.4169 ms. Full-model 121K prefill improved only 851.1 → 858.7 (+0.9%); 16K/32K were +0.1%/+0.2%. Near-capacity checks passed 4/4, but ordinary scored suites were skipped after the performance gate. Code is retained, feature disabled.
+- **Automatic larger chunks / embedding reuse accounting:** no repeatable improvement over the selected fixed 4,096 chunk. Not enabled.
+
+## Validation and attribution
+
+The IQ1_M adapter passed numerical reference, opt-out and 4K/4.5K/8K routed-batch checks, existing IQ2_S/IQ2_XXS checks and CUDA memcheck. All 46 existing fused device functions retain identical SASS; one IQ1_M function is added. Both FP16 thread layouts passed all eight numerical cases, with finite outputs; 512-thread CUDA memcheck reported zero errors. HIP, Windows and other GPUs were **not tested**. This campaign does not update the upstream PR or request cross-platform review.
+
+Native metrics count GPU-generated tokens and actual engine segments. API prefix-cache metrics count client requests. The existing loop-closure guard caused one internal continuation per arm across the scored suites; its injected text explains the small API/native output-count difference. All final usage counters reconcile after accounting for it. Expert-pool hit rates exclude direct PCIe routes; the separate all-routed resident share includes them in the denominator.
+
+TensorFold's [tiled quantized prefill](https://github.com/ashhart/TensorFold/blob/cb2ebf0540f42604e2759b2ddef497861e928248/src/tensorfold/cuda/kernels/qmm_prefill.cu) and [expert-stage sizing](https://github.com/ashhart/TensorFold/blob/cb2ebf0540f42604e2759b2ddef497861e928248/src/tensorfold/cuda/experts_prefill.cu) inspired the investigation. No TensorFold code was copied. The FP16 repair extends Strata's existing Volta implementation; the INT8 adapter extends its fused prefill. The historical **590 → 886 tok/s** gain came from the earlier fused-prefill/batch/VRAM-loan bundle, not this adapter. These measurements do not promise a similar gain on other hardware or weights.
+
+## Reproduction and rollback
+
+The scripts here use prepared private fixtures, immutable expert-profile copies and the existing benchmark workspace's task fixtures. They are not a standalone downloadable benchmark. Each arm starts a fresh engine, checks quiet-host telemetry and protects baseline assets. Commands on this prepared workspace:
 
 ```sh
 cmake --build build/iq1m-current --target strata prefill_fused_iq_test pf_wmma_parity -j2
-STRATA_WMMA_BENCH=1 STRATA_PF_WMMA_NT=256 build/iq1m-current/pf_wmma_parity
 STRATA_WMMA_BENCH=1 STRATA_PF_WMMA_NT=512 build/iq1m-current/pf_wmma_parity
 STRATA_PF_WMMA_NT=512 compute-sanitizer --tool memcheck --error-exitcode 99 build/iq1m-current/pf_wmma_parity
-runtime/venv/bin/python rtx2080/experiments/iq1m-current/final.py fp16-512
 runtime/venv/bin/python rtx2080/experiments/iq1m-current/analyze.py
 runtime/venv/bin/python rtx2080/experiments/iq1m-current/export.py
 ```
 
-The final driver checks that the production binary, profile, source record and expert-profile seed remain unchanged, and that the candidate binary does not change during validation. It runs each arm in a fresh engine, with a copied expert-profile seed and a quiet-host check before each stage. Completed arm labels are skipped on restart; use new prefixes for intentional repeats. Near-capacity follow-up requests count as continuations in the aggregate cache metrics, including the first request after resuming the Pi session. Their file checks are separate from the ordinary ten-task verifier.
-
-## Scope of the possible gain
-
-The historical 590 → 886 tok/s improvement came from the existing fused-prefill / batch / VRAM-loan bundle on the Swift weights. It did not come from this IQ1_M adapter. Forty-five of the model's 48 layers already use the existing fused native-IQ path for large prompt chunks; this investigation primarily targets the three IQ1_M fallback layers. An isolated kernel improvement therefore cannot be applied as the same percentage to whole-model prefill.
-
-The repaired FP16 path dequantizes compressed weights into shared-memory tiles and multiplies FP16 activations with FP32 accumulation. It extends Strata's existing Volta implementation to the 2080's shared-memory limit. This follows the tiled, on-the-fly dequantization direction investigated from TensorFold, but contains no copied TensorFold code. The existing `STRATA_PF_WMMA` switch is broader than IQ1_M: on smaller non-fused prompt chunks it can also select FP16 grouped multiplication for other supported formats. Short-prompt and cached-agent checks are needed for that reason.
-
-### FP16 candidate disposition
-
-The ordinary speed suite completed without failures or skipped tests. Token-weighted results:
-
-| Workload | Production | FP16-512 | Change |
-|---|---:|---:|---:|
-| Chat decode | 57.44 | 57.70 | +0.5% |
-| 4K prefill | 657.85 | 654.72 | −0.5% |
-| 16K prefill | 866.48 | 867.14 | +0.1% |
-| 32K prefill | 881.31 | 883.51 | +0.2% |
-| 121K prefill | 851.1 | 858.7 | +0.9% |
-
-Both near-capacity Pi sessions and their follow-ups passed on both arms (4/4 independent checks per arm, thinking enabled). Across these sessions production generated 5,062 tokens at 63.74 tok/s; FP16 generated 6,127 at 61.84 tok/s. The tool paths and output text differ, so the decode difference is observational, not an isolated decode-kernel result. All native counters matched API usage. Context reached 121,831 tokens on production and 123,720 on FP16.
-
-The FP16 repair is retained as experimental code, not promoted: the isolated kernel improvement did not produce a useful overall model speedup. The planned ordinary scored suites were not launched for this rejected candidate. The final remaining candidate is the original INT8 adapter with the old ring/buffer layout; it passed three exact-edit screens and is being compared on the original 121K fixture before any further coding validation.
+`validate_legacy.py` preserves the completed validation sequence. Its frozen baseline hashes intentionally no longer match after promotion: restore the original snapshot or prepare a new baseline and run labels before a new campaign. Never run it against live production. `CURRENT.json` records the tested binary and source hashes. The original executable is retained privately as `runtime/bin/strata-before-iq1m-20261101`; the original source/profile is commit `9446299b586b8d42c355e5fb54d23c397fdd6e69`. To disable this optimization on the new binary, set `STRATA_PF_FUSED_IQ1_M=0`; restore the original binary/profile for exact baseline rollback.
