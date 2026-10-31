@@ -109,14 +109,15 @@ def speed(label):
     assert not result['results']['failures'] and not result['results']['skipped']
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('mode',choices=['edit','needle','speed']);p.add_argument('arms',nargs='*');p.add_argument('--chunk',default='4096');p.add_argument('--route',default='1.5');p.add_argument('--prefix',default='current');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('mode',choices=['edit','needle','speed']);p.add_argument('arms',nargs='*');p.add_argument('--chunk',default='4096');p.add_argument('--on-chunk');p.add_argument('--route',default='1.5');p.add_argument('--prefix',default='current');a=p.parse_args()
     arms=a.arms or ['prod','off','on','on','off','prod']
     for i,arm in enumerate(arms,1):
         label=f'{a.prefix}-{a.mode}-{i}-{arm}'
         if (R/(label+'.complete.json')).exists():continue
-        with server(label,arm,a.chunk,a.route):
-            if a.mode=='edit':edit(label,arm=arm,chunk=a.chunk,route=a.route)
-            elif a.mode=='needle':needle(label,arm=arm,chunk=a.chunk,route=a.route)
+        chunk=a.on_chunk if arm=='on' and a.on_chunk else a.chunk
+        with server(label,arm,chunk,a.route):
+            if a.mode=='edit':edit(label,arm=arm,chunk=chunk,route=a.route)
+            elif a.mode=='needle':needle(label,arm=arm,chunk=chunk,route=a.route)
             else:speed(label)
         dump(R/(label+'.complete.json'),{'complete':True,'at':time.time()})
     status(phase='complete',mode=a.mode,prefix=a.prefix)

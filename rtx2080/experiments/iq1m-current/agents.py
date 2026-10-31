@@ -4,7 +4,7 @@ import campaign as c
 import harness as h
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('arms',nargs='*');p.add_argument('--chunk',default='4096');p.add_argument('--prefix',default='agents');p.add_argument('--long',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('arms',nargs='*');p.add_argument('--chunk',default='4096');p.add_argument('--on-chunk');p.add_argument('--prefix',default='agents');p.add_argument('--long',action='store_true');a=p.parse_args()
     gold=h.manifest(h.MASTER)
     stop=threading.Event();threading.Thread(target=h.telemetry,args=(stop,),daemon=True).start()
     proxy=http.server.HTTPServer(('127.0.0.1',8088),h.Proxy)
@@ -13,7 +13,7 @@ def main():
         for i,arm in enumerate(a.arms or ['off','on','on','off'],1):
             label=f'{a.prefix}-{i}-{arm}'
             if (c.R/(label+'.complete.json')).exists():continue
-            with c.server(label,arm,a.chunk):
+            with c.server(label,arm,a.on_chunk if arm=='on' and a.on_chunk else a.chunk):
                 if a.long:
                     # Keep compaction off for this explicit near-capacity engine test.
                     # Ordinary suites retain the harness defaults.
