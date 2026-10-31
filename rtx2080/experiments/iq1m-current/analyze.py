@@ -24,7 +24,13 @@ for key,rr in groups.items():
     # HTTP prompt_n is unread tokens; independently retain usage to audit it.
     summary['long'].append({'group':key,'runs':len(rr),'weighted_prefill_tps':1000*tokens/ms if ms else None,'individual_prefill_tps':[x.get('prompt_per_second') for x in t], 'prompt_tokens':[r['usage']['prompt_tokens'] for r in rr],'cached_tokens':[x.get('cache_n') for x in t], 'output_tokens':[r['usage']['completion_tokens'] for r in rr], 'weighted_decode_tps':1000*sum(x.get('predicted_n',0) for x in t)/sum(x.get('predicted_ms',1) for x in t), 'ttft_s':[r['ttft_s'] for r in rr], 'correct':[checks.get(r['label'],{}).get('passed') for r in rr]})
 for suite in sorted((c.R/'runs').glob('*')) if (c.R/'runs').exists() else []:
-    rr=[json.loads(p.read_text()) for p in sorted(suite.glob('*/result.json'))]
+    rr=[]
+    for result in sorted(suite.glob('*/result.json')):
+        r=json.loads(result.read_text())
+        if result.parent.name.endswith('-followup'):
+            for n in r['native']:n['initial_request']=False
+            r['metrics']=metrics.aggregate(r['native'])
+        rr.append(r)
     native=[n for r in rr for n in r['native']]
     summary['agent'].append({'label':suite.name,'tasks':len(rr),'passed':sum(r['passed'] for r in rr),'wall_s':sum(r['wall_s'] for r in rr),'metrics':metrics.aggregate(native),'thinking_requests':sum(h.get('reasoning_chars',0)>0 for r in rr for h in r['http']), 'usage_matches':all(r['native_usage_match'] for r in rr),'per_task':[{'task':r['task'],'passed':r['passed'],'wall_s':r['wall_s'],'metrics':r['metrics']} for r in rr], 'long_checks':{p.name:json.loads(p.read_text()) for p in suite.glob('long-*-check.json')}})
 for p in c.R.glob('*speed*/**/results.json'):

@@ -60,9 +60,9 @@ def sandbox(work,arm,profile):
  else:args+=['--bind',str(profile),str(Path.home()/'.fx')]
  return args
 
-def native_slice(log,offset,out):
+def native_slice(log,offset,out,resume=False):
  out.write_bytes(log.read_bytes()[offset:]);rows,_=m.engine_rows(out)
- for i,row in enumerate(rows):row['initial_request']=i==0
+ for i,row in enumerate(rows):row['initial_request']=i==0 and not resume
  return rows
 
 def telemetry(stop):
@@ -109,7 +109,7 @@ def run_task(label,arm,task,engine_log,prompt=None,resume=False,phase=None,max_o
     except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait()
     rc=124
  wall=time.monotonic()-start
- rows=native_slice(engine_log,offset,dest/'engine.log')
+ rows=native_slice(engine_log,offset,dest/'engine.log',resume=resume)
  calls=[];errors=[]
  if arm=='pi':
   for line in (dest/'stdout.log').read_text().splitlines():
