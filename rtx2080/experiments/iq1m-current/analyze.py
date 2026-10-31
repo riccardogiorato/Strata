@@ -30,9 +30,11 @@ for suite in sorted((c.R/'runs').glob('*')) if (c.R/'runs').exists() else []:
         if result.parent.name.endswith('-followup'):
             for n in r['native']:n['initial_request']=False
             r['metrics']=metrics.aggregate(r['native'])
+        for i,h in enumerate(r['http']):h['initial_request']=i==0 and not result.parent.name.endswith('-followup')
+        r['usage_audit']=metrics.reconcile(r['native'],r['http'])
         rr.append(r)
     native=[n for r in rr for n in r['native']]
-    summary['agent'].append({'label':suite.name,'tasks':len(rr),'passed':sum(r['passed'] for r in rr),'wall_s':sum(r['wall_s'] for r in rr),'metrics':metrics.aggregate(native),'thinking_requests':sum(h.get('reasoning_chars',0)>0 for r in rr for h in r['http']), 'usage_matches':all(r['native_usage_match'] for r in rr),'per_task':[{'task':r['task'],'passed':r['passed'],'wall_s':r['wall_s'],'metrics':r['metrics']} for r in rr], 'long_checks':{p.name:json.loads(p.read_text()) for p in suite.glob('long-*-check.json')}})
+    summary['agent'].append({'label':suite.name,'tasks':len(rr),'passed':sum(r['passed'] for r in rr),'wall_s':sum(r['wall_s'] for r in rr),'metrics':metrics.aggregate(native),'thinking_requests':sum(h.get('reasoning_chars',0)>0 for r in rr for h in r['http']), 'usage_matches':all(r['native_usage_match'] for r in rr),'usage_reconciled':all(r['usage_audit']['reconciled'] for r in rr),'usage_audits':[{'task':r['task'],**r['usage_audit']} for r in rr],'client_cache':metrics.client_cache([h for r in rr for h in r['http']]),'per_task':[{'task':r['task'],'passed':r['passed'],'wall_s':r['wall_s'],'metrics':r['metrics']} for r in rr], 'long_checks':{p.name:json.loads(p.read_text()) for p in suite.glob('long-*-check.json')}})
 for p in c.R.glob('*speed*/**/results.json'):
     d=json.loads(p.read_text());summary['speed'].append({'path':str(p.relative_to(c.R)),'results':d.get('results')})
 c.dump(c.R/'summary.json',summary)

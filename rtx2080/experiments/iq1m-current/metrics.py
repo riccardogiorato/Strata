@@ -63,3 +63,76 @@ def aggregate(rows):
              reply_resume_gap_median=statistics.median(gaps) if gaps else None,
              reply_resume_gap_max=max(gaps) if gaps else None)
     return s
+
+
+def reconcile(native, http):
+    """Align native segments with API calls, including internal reasoning closure.
+
+    API usage can include injected text while native counters count GPU-generated
+    tokens (including a drained STOP token). Keep that delta explicit; never add
+    injected tokens to measured GPU throughput.
+    """
+    cursor = 0
+    aligned = []
+    errors = []
+    for i, request in enumerate(http):
+        usage = request.get('usage', {})
+        timing = request.get('timings', {})
+        if cursor >= len(native) or 'predicted_ms' not in timing:
+            errors.append({'request': i, 'reason': 'missing native segment or API timing'})
+            break
+        first = native[cursor]
+        expected = (usage.get('prompt_tokens'), usage.get('prompt_tokens_details', {}).get('cached_tokens', 0))
+        if (first['prompt_tokens'], first['cached_tokens']) != expected:
+            errors.append({'request': i, 'reason': 'original prompt/cache counts differ'})
+            break
+        start = cursor
+        while cursor < len(native):
+            cursor += 1
+            part = native[start:cursor]
+            dm = sum(x['decode_ms'] for x in part)
+            tolerance = 1.1 * len(part)  # integer log milliseconds versus API decimals
+            if abs(dm - timing['predicted_ms']) <= tolerance:
+                break
+            if dm > timing['predicted_ms'] + tolerance:
+                break
+        count = cursor - start
+        pm = sum(x['prefill_ms'] for x in part)
+        output = sum(x['output_tokens'] for x in part)
+        delta = usage.get('completion_tokens', 0) - output
+        valid = (abs(dm - timing['predicted_ms']) <= tolerance and
+                 abs(pm - timing.get('prompt_ms', -1e9)) <= tolerance and
+                 first['read_tokens'] == timing.get('prompt_n') and
+                 (count > 1 or delta == 0))
+        for api_key, native_key in [('draft_n', 'draft_offered'), ('draft_n_accepted', 'draft_accepted')]:
+            if api_key in timing:
+                valid = valid and timing[api_key] == sum(x[native_key] for x in part)
+        aligned.append({'request': i, 'native_segments': count, 'timing_and_input_match': valid,
+                        'native_output_tokens': output, 'api_output_tokens': usage.get('completion_tokens'),
+                        'api_minus_native_output_tokens': delta,
+                        'internal_read_tokens': sum(x['read_tokens'] for x in part) - first['read_tokens']})
+        if not valid:
+            errors.append({'request': i, 'reason': 'native work does not reconcile with API counters'})
+            break
+    if cursor != len(native):
+        errors.append({'reason': 'unassigned native segments', 'remaining': len(native) - cursor})
+    return {'reconciled': not errors and len(aligned) == len(http), 'errors': errors,
+            'http_requests': len(http), 'native_segments': len(native),
+            'internal_continuations': sum(x['native_segments'] - 1 for x in aligned),
+            'api_minus_native_output_tokens': sum(x['api_minus_native_output_tokens'] for x in aligned),
+            'calls': aligned}
+
+
+def client_cache(requests):
+    """Cache ratios at the API boundary, excluding internal engine continuations."""
+    rows = [(r.get('usage', {}).get('prompt_tokens', 0),
+             r.get('usage', {}).get('prompt_tokens_details', {}).get('cached_tokens', 0),
+             r.get('initial_request', True)) for r in requests]
+    continuation = [r for r in rows if not r[2]]
+    return {'http_requests': len(rows), 'prompt_tokens': sum(r[0] for r in rows),
+            'cached_tokens': sum(r[1] for r in rows),
+            'token_hit_pct': pct(sum(r[1] for r in rows), sum(r[0] for r in rows)),
+            'request_hit_pct': pct(sum(r[1] > 0 for r in rows), len(rows)),
+            'continuation_requests': len(continuation),
+            'continuation_token_hit_pct': pct(sum(r[1] for r in continuation), sum(r[0] for r in continuation)),
+            'continuation_request_hit_pct': pct(sum(r[1] > 0 for r in continuation), len(continuation))}

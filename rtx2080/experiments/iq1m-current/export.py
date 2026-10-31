@@ -43,7 +43,9 @@ for row in s['agent']:
     out['agents'].append({'label':row['label'],'kind':'near-capacity' if long else 'scored',
                          'phases_or_tasks':row['tasks'],'passed':sum(x['passed'] for x in row['long_checks'].values()) if long else row['passed'],
                          'wall_s':row['wall_s'],'metrics':row['metrics'],'thinking_requests':row['thinking_requests'],
-                         'usage_matches':row['usage_matches'],
+                         'usage_matches':row['usage_matches'],'usage_reconciled':row['usage_reconciled'],'client_cache':row['client_cache'],
+                         'internal_continuations':sum(x['internal_continuations'] for x in row['usage_audits']),
+                         'api_minus_native_output_tokens':sum(x['api_minus_native_output_tokens'] for x in row['usage_audits']),
                          'checks':{k:{field:v[field] for field in ('passed','file_check_passed','agent_exit','tool_calls')} for k,v in row['long_checks'].items()},
                          'task_scores':[] if long else [{'task':r['task'],'passed':r['passed']} for r in row['per_task']]})
 for row in s['speed']:
