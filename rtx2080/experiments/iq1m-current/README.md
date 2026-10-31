@@ -26,3 +26,9 @@ Scripts live here; raw inputs, outputs and configs stay under ignored `runtime/i
 - Before that fix, the existing WMMA parity test failed to launch six of eight cases; afterwards all eight pass. CUDA memcheck reports zero errors. The first full-model FP16 run passed the edit at 875.9 tok/s.
 
 No production settings have changed. Chunk tuning, matched final controls and full agentic validation remain to be completed. The FP16 tile fix is an extension of upstream Strata's Volta kernel, separate from PR #4642's INT8 adapter. Neither is copied TensorFold code.
+
+### Additional tuning screens
+
+Automatic prefill (`auto:8192`, lend 100%) selected 4,352 tokens for FP16 and 4,608 for compact INT8. At 122,451 input tokens, FP16 measured 870.0 tok/s, FP16 with upstream embedding reuse accounting 860.1, INT8 with legacy layout 864.4, and compact INT8 888.3. All four exact edits passed. These are single screening runs, not paired final claims; the compact path's earlier failure remains part of its record.
+
+An opt-in `STRATA_PF_WMMA_NT=512` variant doubles the narrow tile's warps while retaining its 51,200-byte shared allocation and FP16 arithmetic. In the synthetic 693-row / seven-expert reference fixture, IQ1_M decreased from 0.4838 to 0.4169 ms per call (100 GPU-timed calls). Both thread layouts passed all eight numerical cases, including finite-output checks. This is a kernel microbenchmark, not an end-to-end speedup claim. Full-model and agent checks determine promotion.
