@@ -2,12 +2,12 @@
 
 The current production settings are in [`../profile.json`](../profile.json). Historical reports retain rejected candidates and limitations; an archived result is not an enabled feature.
 
-Active research branches:
+Research branches and completed promotions:
 
-- `experiment/iq1m-current`: [current-source IQ1_M / FP16 validation](iq1m-current/README.md), including rejected candidates and near-capacity tests.
+- `experiment/iq1m-current`: [completed IQ1_M / FP16 validation](iq1m-current/README.md). INT8 with the previous buffer layout was promoted November 1: +1.8% paired 121K prefill, 20/20 coding attempts on both arms. FP16 and compact layout remain disabled.
 
 - `experiment/persistent-prefix-cache`: oMLX-inspired serialized prefix pages, measured restart/eviction gains, synchronous save costs; not production.
-- `experiment/iq1m-fused-prefill`: TensorFold-inspired IQ1_M adapter and upstream draft PR history; not production.
+- `experiment/iq1m-fused-prefill`: original TensorFold-inspired IQ1_M adapter and upstream PR history on the older base; superseded by the validated integration above.
 
 The earlier whole-session SSD proxy and its regression tests are preserved in [`snapshot-proxy/`](snapshot-proxy/README.md), alongside the newer native page-cache branch.
 

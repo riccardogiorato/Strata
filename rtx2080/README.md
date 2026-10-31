@@ -14,7 +14,7 @@ python rtx2080/manage.py check
 python rtx2080/manage.py bench
 ```
 
-Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `runtime/current.json`. There is no separate production setting hidden in an old version checkout. The native binary is `runtime/bin/strata`; its original tested hash and engine-source commit are in `CURRENT.json`. New builds do not replace it automatically.
+Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `runtime/current.json`. There is no separate production setting hidden in an old version checkout. The native binary is `runtime/bin/strata`; its currently tested hash and engine-source commit are in `CURRENT.json`. New builds do not replace it automatically.
 
 ## Current production
 
@@ -23,13 +23,14 @@ Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `ru
 - 131,072 context capacity; 32,768 GPU-resident INT8 KV tokens; KV prefetch.
 - MTP spec4 / minimum probability 0.70; routing prior 1.5.
 - 4,096 requested prefill chunk; 2,000 requested expert-cache slots, elastically resized.
+- IQ1_M INT8 fused prefill enabled with the previous buffer layout; FP16 WMMA disabled.
 - PCIe fraction 0.35; adaptation every step, 80 swaps, decay 0.97.
 - 8 GiB / two-slot RAM session cache; minimum 1,024 tokens and park gain 1,024.
 - One active decode request at a time; waiting requests queue. Cache slots are not parallel decode slots.
 - CPU vision helper, three threads; authenticated API on port 8080; existing LAN access retained.
 - Client-controlled sampling, normal thinking template, output fitted to available context; local loop closure enabled.
 
-The current routing-on profile measured 62.16 native agent decode tok/s (10/10 tasks), 56.89 short-chat decode tok/s, 880.42 tok/s at 32K prefill and 846.76 tok/s at 121K cold prefill. These are the October 31 campaign results, not a new performance claim from moving directories. The migration keeps the tested executable byte-for-byte.
+The November 1 validated update reads a cold 121K prompt at **866.2 tok/s**, versus 850.6 on the same-day previous production control (+1.8%). The usual 32K suite measured 889.2 tok/s, short chat decode 57.1 tok/s, and scored coding decode 62.16 tok/s. Both configurations passed 20/20 coding attempts and 4/4 near-capacity checks. [Full comparison, rejected alternatives and compact evidence](experiments/iq1m-current/README.md). The exact tested executable is installed; its hash and rollback record are in `CURRENT.json`.
 
 ## What is local and what is upstream
 
@@ -39,11 +40,12 @@ Our enabled changes relative to upstream release `c62d5e3`:
 2. SM75 native-IQ fused-prefill extension, `STRATA_PF_FUSED_SM75_IQ=1`: smaller tiles to fit IQ codebooks in Turing shared memory.
 3. Prefill VRAM loans: defer/release MTP, head and verifier allocations while reading a prompt, then restore them for generation; repeat loans at 8,192 unread tokens and above.
 4. Hot session restore: move restored state into the native RAM cache without recopying its large KV buffers.
-5. Local repeated-thinking closure (`reasoning_loop_recovery: close`): use upstream detection and budget-closure machinery to resume once within the original output cap. This is a mitigation, not proof that the model's underlying loop cause is fixed.
+5. IQ1_M/Q2_0 fused-prefill adapter, `STRATA_PF_FUSED_IQ1_M=1`, with `STRATA_PF_FUSED_LEGACY_LAYOUT=1` to retain the old buffer allocation. This extends fusion to the three remaining layers in the current mixed weights; activation rounding can change outputs.
+6. Local repeated-thinking closure (`reasoning_loop_recovery: close`): use upstream detection and budget-closure machinery to resume once within the original output cap. This is a mitigation, not proof that the model's underlying loop cause is fixed.
 
 MTP, residency-biased routing, PCIe expert access, native RAM conversation caching, adaptive expert caching, elastic cache allocation, KV prefetch and the general SM75 performance switches are upstream features. Upstream defaults also enable route-tail skipping at rank 7+ and CPU prompt sharing below 1,024 tokens. Routing and tail skipping can change outputs.
 
-Disabled: KVA approximate prefill, all-checkpoint persistence and plain-prompt mode. The experimental IQ1_M kernel and persistent prefix-page tier are **not enabled in production**.
+Disabled: KVA approximate prefill, all-checkpoint persistence, plain-prompt mode, the compact all-fused buffer layout, FP16 grouped WMMA and the persistent prefix-page tier. The repaired FP16 implementation is present as opt-in experimental code, but is **not enabled in production**.
 
 ## Experiments without more top-level checkouts
 
@@ -51,7 +53,8 @@ The same Git repository holds these branches:
 
 - `rtx2080`: current daily-use code and profile.
 - `experiment/persistent-prefix-cache`: oMLX-inspired persistent serialized prefix pages. Cold-restart and evicted-history recovery improved in the recorded experiments; saving remains synchronous and costs time. This is not a full oMLX implementation. See that branch's `docs/PERSISTENT_PREFIX_PAGES.md` and benchmark record.
-- `experiment/iq1m-fused-prefill`: TensorFold-inspired IQ1_M adapter, preserving draft PR #4642's existing code/history. It remains experimental and is not the production IQ2_XS optimization.
+- `experiment/iq1m-fused-prefill`: original TensorFold-inspired IQ1_M adapter and PR #4642 history on its older base, preserved unchanged.
+- `experiment/iq1m-current`: completed current-source integration and validation. The validated INT8/old-layout configuration is now merged into production; FP16 and compact-layout alternatives remain disabled.
 
 Before switching the serving checkout to an experimental branch, stop `strata-serve.service`. Experimental branches retain their tested older base versions; do not apply the production profile blindly. Follow the branch's own build/configuration documentation. Return with `git switch rtx2080` and restart the service. Use separate ignored build outputs; do not overwrite `runtime/bin/strata` for a test.
 

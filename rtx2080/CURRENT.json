@@ -4,16 +4,17 @@
   "upstream_version": "0.2.9",
   "engine_version": "0.1.55",
   "upstream_commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab",
-  "tested_engine_source_commit": "0fded4a0a319cea9a4036adb4c50bbfe456fc159",
-  "tested_engine_sha256": "5099a697eb34ab1f5b4a9c81b738f96ef92e9c84c25f90ac1b742a7a61c8e719",
+  "tested_engine_source_commit": "e9fe9e763d9f7b69826c990058e49f89dafeef71",
+  "tested_engine_sha256": "2698152f7ab0e08f1246d7d28b1d674f3a1746bc788e005538ff02d1347962e3",
   "vision_helper_sha256": "396dc65280593ab83960f369a5bdeb91851f00bfb375d56e5194642d7909bd14",
   "hardware": "RTX 2080 8GB / SM75 / 165W / 64GB RAM",
   "model": "Swift 1.5 Qwen3.8 Flash-Next GSQ-RCO IQ2_XS 125B",
   "experimental_branches": [
     "experiment/persistent-prefix-cache",
-    "experiment/iq1m-fused-prefill"
+    "experiment/iq1m-fused-prefill",
+    "experiment/iq1m-current"
   ],
-  "benchmark_date": "2026-10-31",
+  "benchmark_date": "2026-11-01",
   "consolidation": {
     "date": "2026-10-31",
     "retired_sibling_directories": 25,
@@ -22,5 +23,31 @@
     "historical_campaigns": 41,
     "post_cleanup_restart_and_chat_passed": true,
     "native_binary_unchanged": true
+  },
+  "iq1m_promotion": {
+    "date": "2026-11-01",
+    "report": "rtx2080/experiments/iq1m-current/README.md",
+    "configuration": "INT8 IQ1_M fusion, legacy buffer layout, FP16 WMMA disabled",
+    "baseline_source_commit": "9446299b586b8d42c355e5fb54d23c397fdd6e69",
+    "baseline_engine_sha256": "5099a697eb34ab1f5b4a9c81b738f96ef92e9c84c25f90ac1b742a7a61c8e719",
+    "baseline_binary_backup": "runtime/bin/strata-before-iq1m-20261101",
+    "prefill_121k_before_tps": 850.6050094713943,
+    "prefill_121k_after_tps": 866.2230902395648,
+    "coding_scores": {
+      "baseline": "20/20",
+      "candidate": "20/20"
+    },
+    "near_capacity_checks": {
+      "baseline": "4/4",
+      "candidate": "4/4"
+    },
+    "post_install_checks": {
+      "health": true,
+      "chat": true,
+      "tool_call": true,
+      "max_context": 131072,
+      "vision_available": true,
+      "one_native_gpu_process": true
+    }
   }
 }

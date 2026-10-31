@@ -68,7 +68,10 @@
     "STRATA_PF_FUSED_SM75": "1",
     "STRATA_PF_FUSED_SM75_IQ": "1",
     "STRATA_ROUTE_PRIOR": "1.5",
-    "STRATA_KVA": "0"
+    "STRATA_KVA": "0",
+    "STRATA_PF_FUSED_IQ1_M": "1",
+    "STRATA_PF_FUSED_LEGACY_LAYOUT": "1",
+    "STRATA_PF_WMMA": "0"
   },
   "vision": {
     "exe": "${REPO}/runtime/bin/strata-vision",
