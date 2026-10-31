@@ -3880,6 +3880,7 @@ class Service:
         self.vram_reserve_asked = False                  # a POST /v1/vram was made (vram_reserve None is then asked)
         self.vision_held = False                         # an elastic encoder holds VRAM the expert cache gave it
         self.last_image_at = 0.0                         # when an image turn last ended (the elastic encoder's idle)
+        self.plain_prompt = False                       # omit server-authored reasoning instructions and wrap-up prose
         self.reasoning_loop_recovery = False
         self.reasoning_budget_tokens = 0                 # #123: the config's default thinking budget (0: none)
         self.repeat_stop_tokens = REPEAT_STOP_TOKENS     # #606: one token this many times in a row ends a reply (0: off)
@@ -4678,6 +4679,10 @@ class Service:
         thinking) is rendered as a default one up to the answer - the same prompt start, so the conversation cache
         keeps it - and its effort follows in a short system turn right before the answer (thinking off: the template's
         empty thinking block).  The engine (--tail-role-token) checkpoints in front of that turn."""
+        if self.plain_prompt:
+            # This template emits no effort prose for medium. Keep thinking on/off,
+            # the harness messages and tool protocol intact; bypass effort_end.
+            return self.template.render(messages, tools=tools, **{**kwargs, "reasoning_effort": "medium"})
         effort = kwargs.get("reasoning_effort")
         off = kwargs.get("enable_thinking") is False
         if not self.effort_end or (not off and effort in (None, "", "xhigh", "high")):
@@ -5243,7 +5248,7 @@ class Service:
                                     next_loop_check = n + LOOP_CHECK_EVERY
                                     repeat_coverage = reasoning_repeat_coverage(reasoning_text)
                                     if repeat_coverage >= LOOP_COVERAGE:
-                                        if self.reasoning_loop_recovery == "stop":
+                                        if self.reasoning_loop_recovery == "stop" or self.plain_prompt:
                                             looped = True        # #728: end the reply here, as for a repeated token
                                             break
                                         if not emb:              # "recover": not for a request with pictures
@@ -5365,7 +5370,7 @@ class Service:
                         # thinking ended, after the blank line the template puts before a call.
                         if wrap:
                             budget = st["thinking_budget"] = None
-                            text = REASONING_WRAP_UP + (force or "")
+                            text = (REASONING_CLOSE if self.plain_prompt else REASONING_WRAP_UP) + (force or "")
                         else:
                             text = "\n" * (2 - (len(tail) - len(tail.rstrip("\n")))) + force
                         force = None
@@ -8454,6 +8459,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
     if isinstance(rs, bool) or not isinstance(rs, int) or rs < 0:
         raise SystemExit(f"[strata] config \"repeat_stop_tokens\" must be a whole number >= 0 (0 = off), not {rs!r}")
     svc.repeat_stop_tokens = rs
+    plain = cfg.get("plain_prompt", False)
+    if not isinstance(plain, bool):
+        raise SystemExit('[strata] config "plain_prompt" must be true or false')
+    svc.plain_prompt = plain
+    if plain:
+        print("[strata] plain_prompt: no effort instructions or reasoning wrap-up prose", flush=True)
     svc.effort_end = bool(effort_end)                   # #458: "effort_position": "end" with an engine that has it
     if cfg.get("reasoning_budget_tokens") is not None:  # #123: a default thinking budget for every request
         try:
