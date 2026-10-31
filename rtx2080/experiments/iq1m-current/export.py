@@ -1,5 +1,5 @@
 """Publish compact counters and checks, never raw prompts, replies or credentials."""
-import argparse, json
+import argparse, hashlib, json, re
 from pathlib import Path
 import campaign as c
 
@@ -24,6 +24,19 @@ out={'hardware':'RTX 2080 8GB, SM75, 165W; i5-9600K, 64GB RAM',
      'fixture_sha256':provenance['fixture_sha256'],'arm_env_overrides':c.ARM_ENV,
      'long_prompt':s['long'],'host_load':s['host_load'],'agents':[], 'speed':[],
      'decisions':[r for line in (c.R/'results.jsonl').read_text().splitlines() if (r:=json.loads(line))['event']=='candidate_decision']}
+def log_check(name, pattern):
+    data=(c.R/name).read_bytes();match=re.search(pattern,data.decode())
+    assert match,name
+    return {'log_sha256':hashlib.sha256(data).hexdigest(),'reported_errors_or_failures':int(match[1])}
+sass=json.loads((c.R/'sass-comparison.json').read_text())
+out['kernel_validation']={
+    'iq1_adapter_checks':[{'check':r['label'],'exit':r['exit']} for r in s['kernel']],
+    'fp16_256_reference':log_check('wmma-warp-256.log',r'pf_wmma_parity: (\d+) failures'),
+    'fp16_512_reference':log_check('wmma-warp-512.log',r'pf_wmma_parity: (\d+) failures'),
+    'fp16_512_memcheck':log_check('wmma-512-memcheck.log',r'ERROR SUMMARY: (\d+) errors'),
+    'existing_fused_sass':{'matched':sass['matched'],'changed':len(sass['changed']),'missing':len(sass['missing']),'added':len(sass['added'])},
+    'not_tested':['HIP','Windows','other GPUs'],
+}
 for row in s['agent']:
     if not row['tasks']:continue
     long=bool(row['long_checks'])
