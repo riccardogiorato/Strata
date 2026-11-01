@@ -361,6 +361,34 @@ void reference_part(const Pair& p, cudaStream_t s) {
     for (int64_t i = 0; i < rows; ++i)
         if (fsrc[(size_t) slot[(size_t) i]] != (int32_t) (i / K)) throw std::runtime_error("group: slot/src disagree");
 
+    // Diagnostic for the compact-layout investigation: regroup identical token/expert pairs and
+    // change launch boundaries. Compare by original pair, not by the atomic grouping's row order.
+    // The reference checks below still decide numerical validity; this reports exact-value repeatability.
+    if (std::getenv("STRATA_TEST_FUSED_REPEAT")) {
+        for (int repeat = 0; repeat < 4; ++repeat) {
+            const std::vector<int> cuts = repeat & 1 ? std::vector<int>{0, 7, 31, E} : std::vector<int>{0, E};
+            run_fused(p, geo, fb, x_dev.as<float>(), T, E, cuts, blob, s);
+            ck(cudaStreamSynchronize(s), "repeat sync");
+            const auto again = download(fb.dm, (size_t) rows * N);
+            const auto next_slot = download_i(fb.slot, (size_t) rows);
+            const auto next_src = download_i(fb.src, (size_t) rows);
+            size_t changed = 0;
+            for (int64_t i = 0; i < rows; ++i) {
+                if (next_src[(size_t) next_slot[(size_t) i]] != (int32_t) (i / K))
+                    throw std::runtime_error("repeat group: slot/src disagree");
+                for (int o = 0; o < N; ++o) {
+                    const float a = y_f[(size_t) slot[(size_t) i] * N + o];
+                    const float b = again[(size_t) next_slot[(size_t) i] * N + o];
+                    changed += a != b;
+                }
+            }
+            const Err delta = compare(again, [&](size_t i) { return next_slot[i]; },
+                                      y_f, [&](size_t i) { return slot[i]; }, (size_t) rows);
+            std::printf("  regroup repeat %d: %zu changed values, relative RMS %.9e, worst %.9e\n",
+                        repeat, changed, delta.rms, delta.worst);
+        }
+    }
+
     // the reference, an expert at a time on all cores
     std::vector<float> ref((size_t) rows * N), ref2((size_t) rows * N);   // ref2: the same with the kernels' int8 rounding
     std::vector<std::thread> th;
