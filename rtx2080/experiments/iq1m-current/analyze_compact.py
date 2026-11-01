@@ -28,8 +28,10 @@ for x in rows:
   row['engine_errors']=bool(re.search(r'CUDA error|illegal memory|^ERR ',raw,re.M))
  out['requests'].append(row)
 files=list(sorted(R.glob('*.logits.0')))
+by_label={r['label']:r for r in out['requests']}
 for a,b in itertools.combinations(files,2):
- if a.name.split('-')[0]!=b.name.split('-')[0]:continue
+ ar=by_label.get(a.name.removesuffix('.logits.0'));br=by_label.get(b.name.removesuffix('.logits.0'))
+ if not ar or not br or (ar['phase'],ar['usage']['prompt_tokens'])!=(br['phase'],br['usage']['prompt_tokens']):continue
  x=np.fromfile(a,dtype='<f4').astype(np.float64);y=np.fromfile(b,dtype='<f4').astype(np.float64)
  assert x.shape==y.shape and np.isfinite(x).all() and np.isfinite(y).all()
  def lp(z):

@@ -1085,7 +1085,8 @@ remain eligible for the existing CPU-sharing policy. Unset or zero preserves the
 setting does not change the streaming threshold or routing prior. It applies at the actual prefill-chunk
 boundary, including short assistant-template suffixes inside a large request. The automatic share learns
 from timings and can choose different CPU/GPU arithmetic on repeated identical inputs. The RTX 2080
-follow-up is testing `N=16` to exclude a six-token suffix without disabling sharing on larger tool results.
+follow-up tested `N=16` to exclude a six-token suffix without disabling sharing on larger tool results.
+The [measured results and tradeoffs](../rtx2080/experiments/iq1m-current/compact.md) cover this one GPU/model profile.
 
 ### IQ1_M / Q2_0 prompt experts on Turing (opt-in)
 

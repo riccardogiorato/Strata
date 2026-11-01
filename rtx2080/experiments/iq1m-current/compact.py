@@ -47,6 +47,9 @@ def main():
  stop=threading.Event();threading.Thread(target=h.telemetry,args=(stop,),daemon=True).start()
  try:
   if a.mode in ('agents','longagent'):
+   for required in (c.R/'measure.py',h.PI,h.FX,h.P/'pi/models.json',h.P/'pi/settings.json'):
+    assert required.is_file(),f'Missing harness prerequisite: {required}'
+   assert len(h.TASKS)==10, 'Expected ten scored fixtures'
    import agents
    sys.argv=['agents.py',*a.arms,'--prefix',a.prefix]+(['--long'] if a.mode=='longagent' else [])
    quiet();agents.main();protected();return
