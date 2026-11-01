@@ -1,6 +1,6 @@
 """Publish only compact counters; prompts, model output and local config stay private."""
 from pathlib import Path
-import hashlib,json,statistics,sys
+import ast,hashlib,json,statistics,sys
 ROOT=Path(__file__).resolve().parents[3]
 R=ROOT/'runtime/yukon-three-20261101'
 sys.path.insert(0,str(ROOT/'rtx2080/experiments/iq1m-current'))
@@ -13,18 +13,29 @@ def rate(rows,tokens,ms):
 
 def collect():
     events=[json.loads(s) for s in (R/'results.jsonl').read_text().splitlines()]
+    telemetry=[json.loads(s) for s in (R/'telemetry.jsonl').read_text().splitlines()]
     out={'hardware':'RTX 2080 SM75, 8 GiB, 165 W; i5-9600K; 64 GiB RAM',
          'capacity_tokens':131072,'resident_kv_tokens':32768,
+         'excluded_measurements':{'baseline-profile':'Initial diagnostic: compiler overlap, thinking off, missing decode profiling switch'},
          'runs':{},'checks':[x for x in events if x.get('event') in ('edit_correctness','needle_correctness','smoke_correctness')],
          'kernel_logs':{}}
-    for name in ['gdn-final.log','gdn-split-control.log','head-layout-control.log','projections-idle.log']:
+    for name in ['gdn-final.log','gdn-split-control.log','gdn-extended.log','gdn-extended-split.log','head-layout-control.log','projections-idle.log']:
         p=R/name
         if p.exists():out['kernel_logs'][name]=p.read_text().splitlines()
     for ev in events:
         if ev.get('event')!='boot':continue
         label=ev['label'];log=R/(label+'.engine.log')
         row={k:ev[k] for k in ['arm','binary_sha256','source_commit','chunk','extra_env']}
-        row['complete']=(R/(label+'.complete.json')).exists()
+        completion=R/(label+'.complete.json')
+        row['complete']=completion.exists()
+        if completion.exists():
+            samples=[x for x in telemetry if ev['at'] <= x['at'] <= completion.stat().st_mtime]
+            gpu=[]
+            for x in samples:
+                try:gpu.append([float(v.strip().split()[0]) for v in x['gpu'].split(',')])
+                except (ValueError,KeyError):pass
+            if gpu:row['gpu_telemetry']={name:{'min':min(v[i] for v in gpu),'max':max(v[i] for v in gpu),'median':statistics.median(v[i] for v in gpu)} for i,name in enumerate(['utilization_pct','power_w','temperature_c','clock_mhz','vram_mib'])}
+
         row['engine_log_sha256']=hashlib.sha256(log.read_bytes()).hexdigest() if log.exists() else None
         if log.exists():
             native,kv=m.engine_rows(log);row['native']=m.aggregate(native);row['final_kv_segment']=kv
@@ -44,9 +55,28 @@ def collect():
             ns=[];tr=[]
             for p in sorted(tasks):
                 t=read(p);ns+=t['native'];tr.append({k:t[k] for k in ['task','passed','verify_passed','violations','errors','tool_calls','tool_errors','exit','wall_s']})
+                tr[-1]['phase_directory']=p.parent.name
+                tr[-1]['reasoning_chars']=sum(q.get('reasoning_chars',0) for q in t['http'])
                 tr[-1]['reconciliation']=m.reconcile(t['native'],t['http'])
             row['agents']={'passed':sum(t['passed'] for t in tr),'tasks':tr,'native':m.aggregate(ns)}
             row['long_checks']={p.stem:read(p) for p in (R/'runs'/label).glob('long-*-check.json')}
+            if row['long_checks']:
+                follow=row['long_checks'].get('long-followup-check')
+                if follow:
+                    f=R/'private/work'/label/'long-context/cached_value.py'
+                    try:
+                        tree=ast.parse(f.read_text());fn=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='cached_value')
+                        follow['docstring_present']=bool(ast.get_docstring(fn))
+                    except (OSError,SyntaxError,StopIteration):follow['docstring_present']=False
+                    follow['passed']=follow['passed'] and follow['docstring_present']
+                row['agents']['passed']=sum(v['passed'] for v in row['long_checks'].values())
+                row['agents']['score_source']='near-capacity initial/follow-up file and clean-agent checks; follow-up also requires docstring'
+                for task in tr:
+                    phase=task['phase_directory'].rsplit('-',1)[-1]
+                    check=row['long_checks'].get('long-'+phase+'-check',{})
+                    task['passed']=check.get('passed',False)
+                    task['verify_passed']=check.get('file_check_passed',False)
+
         row['requests']=[{k:v for k,v in x.items() if k not in ('at','content_sha256')} for x in events if x.get('event')=='request' and (x['label']==label or x['label'].startswith(label+'-'))]
         out['runs'][label]=row
     return out

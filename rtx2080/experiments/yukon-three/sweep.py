@@ -3,7 +3,7 @@ import argparse,json,subprocess,sys,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[3]
 R=ROOT/'runtime/yukon-three-20261101'
-p=argparse.ArgumentParser();p.add_argument('mode',choices=['speed','edit','needle','agents','longagent']);p.add_argument('--prefix',required=True);p.add_argument('arms',nargs='+');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('mode',choices=['speed','edit','needle','policy','agents','longagent']);p.add_argument('--prefix',required=True);p.add_argument('arms',nargs='+');a=p.parse_args()
 for i,arm in enumerate(a.arms,1):
     label=f'{a.prefix}-{i}-{arm}'
     completion=label+('-1-'+arm if a.mode in ('agents','longagent') else '')+'.complete.json'

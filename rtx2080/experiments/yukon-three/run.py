@@ -31,7 +31,7 @@ def protected():
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('mode', choices=['profile', 'speed', 'edit', 'needle', 'smoke', 'agents', 'longagent'])
+    p.add_argument('mode', choices=['profile', 'speed', 'edit', 'needle', 'smoke', 'policy', 'agents', 'longagent'])
     p.add_argument('--arm', default='baseline', choices=list(c.ARM_ENV))
     p.add_argument('--label', required=True)
     a = p.parse_args()
@@ -69,7 +69,9 @@ def main():
 
 def run_request_suite(a, extra):
     with c.server(a.label, a.arm, extra=extra):
-        if a.mode == 'smoke':
+        if a.mode == 'policy':
+            policy(a.label, a.arm)
+        elif a.mode == 'smoke':
             smoke(a.label, a.arm)
         elif a.mode == 'speed':
             c.speed(a.label)
@@ -95,6 +97,22 @@ def run_request_suite(a, extra):
                 request.update(max_tokens=1536, temperature=0)
                 c.sample(f'{a.label}-{size}', request, arm=a.arm, phase='cold-profile')
                 c.sample(f'{a.label}-{size}-warm', request, arm=a.arm, phase='warm-profile')
+
+
+def policy(label, arm):
+    # Fixed prompts/seeds. Decode rates use generated tokens / native decode time;
+    # output is deliberately long and may hit the cap, so this is not a score.
+    for phase, temperature, penalty in [('greedy',0,0),('sampled',0.7,0),
+                                        ('sampled-penalty',0.7,0.2),('greedy-again',0,0)]:
+        body={'model':'local-model','temperature':temperature,'seed':42,'max_tokens':768,
+              'chat_template_kwargs':{'enable_thinking':False},
+              'messages':[{'role':'user','content':
+                'Explain in at least 1200 words how to design a reliable cache for a distributed '
+                'application. Discuss TTL, invalidation, concurrency, eviction, consistency, '
+                'testing and operational metrics, with concrete examples and tradeoffs. '
+                'Use prose, not code. Develop each topic in detail.'}]}
+        if penalty:body.update(presence_penalty=penalty,frequency_penalty=penalty)
+        c.sample(label+'-'+phase,body,arm=arm,phase=phase)
 
 
 def smoke(label, arm):

@@ -52,7 +52,7 @@ template <class F> double timed(cudaStream_t s, F f) {
 }
 int main() {
   using namespace strata::kernels;
-  constexpr int HK = 16, HV = 48, C = 10240, V = 6144, MT = 5,
+  constexpr int HK = 16, HV = 48, C = 10240, V = 6144, MT = 8,
                 SN = 128 * 128 * HV;
   cudaStream_t stream;
   ck(cudaStreamCreate(&stream));
@@ -129,7 +129,27 @@ int main() {
                T, K, a, b, (a / b - 1) * 100);
       }
     }
+  // Production self-commits T1 in the output kernel. Compare that path too,
+  // not only the separate state-only commit used by wider windows.
+  ref.set(initial);
+  cand.set(initial);
+  const int one = 1;
+  ck(cudaMemcpy(keep, &one, 4, cudaMemcpyHostToDevice));
+  gdn_step_norm_multi(ref.p, prev.p, C, pg.p, pb.p, z.p, gamma.p, 1e-6f, yr.p,
+                      HK, HV, 1, keep, stream);
+  gdn_step_norm_deferred(cand.p, nullptr, nullptr, nullptr, 0, prev.p, C, pg.p,
+                         pb.p, z.p, gamma.p, 1e-6f, yc.p, HK, HV, 1, stream);
+  gdn_flush_pending(cand.p, SN, prev.p, MT * C, pg.p, pb.p, MT * HV, C, HK, HV,
+                    1, keep, stream);
+  ck(cudaStreamSynchronize(stream));
+  auto sr = ref.get(), sc = cand.get(), ar = yr.get(), ac = yc.get();
+  if (memcmp(sr.data(), sc.data(), SN * 4) ||
+      memcmp(ar.data(), ac.data(), V * 4)) {
+    fprintf(stderr, "FAIL single-token self-commit parity\n");
+    return 3;
+  }
+  puts("PASS single-token self-commit parity");
   cudaFree(keep);
   cudaStreamDestroy(stream);
-  puts("PASS all 30 accepted-prefix/window combinations");
+  puts("PASS all 72 accepted-prefix/window combinations");
 }
