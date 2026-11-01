@@ -253,16 +253,6 @@ inline double cpu_share_env() {   // -1: measured
     return v == -2.0 ? (g_share_default ? -1.0 : 0.0) : v;
 }
 inline bool cpu_share_on() { return cpu_share_env() != 0.0; }
-// Opt-in floor for sharing: very short template suffixes need not calibrate a CPU/GPU split.
-// Auto's timing-dependent split changes arithmetic and can vary even for an identical prompt.
-// Keep the existing behavior when unset; larger chunks remain eligible for the measured share.
-inline int64_t cpu_share_min() {
-    static const int64_t v = [] {
-        const char* e = std::getenv("STRATA_PREFILL_CPU_SHARE_MIN");
-        return e ? std::max<int64_t>(0, (int64_t) std::atoll(e)) : 0;
-    }();
-    return v;
-}
 // STRATA_PREFILL_CPU_SHARE_MAX (default 3072, at least 1024): with the share on, chunks below it are staged after their
 // routing - so they can hand the CPU its share - instead of streaming every expert the cards do not hold.  The share pays
 // on chunks up to ~3K tokens, where few tokens route to many of the streamed experts; 1024 keeps the old limit.
@@ -3354,7 +3344,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
             bool held = false;
             ~PoolHold() { if (held) g_cpu_pool_busy.store(false, std::memory_order_release); }
         } pool_hold;
-        if (cpu_pool_ != nullptr && cpu_share_on() && T >= cpu_share_min() && !stream_all && !pipe_chunked) {
+        if (cpu_pool_ != nullptr && cpu_share_on() && !stream_all && !pipe_chunked) {
             bool expect = false;
             pool_hold.held = g_cpu_pool_busy.compare_exchange_strong(expect, true, std::memory_order_acq_rel);
         }

@@ -1078,16 +1078,6 @@ Options that change answers stay separate: `STRATA_SELECT_SIMT=1|2`, `STRATA_PA_
 (Q2_0 pack, 7.5 card only), `STRATA_PF_FUSED_Q2N=1` (the native Q2_0 pack's prompt experts on sm_80+, below) and
 `STRATA_BF16_TC=1` with `STRATA_XN_F16`.
 
-### Minimum chunk for CPU expert sharing (opt-in)
-
-`STRATA_PREFILL_CPU_SHARE_MIN=N` keeps chunks smaller than N tokens on the GPU, while larger chunks
-remain eligible for the existing CPU-sharing policy. Unset or zero preserves the current policy; this
-setting does not change the streaming threshold or routing prior. It applies at the actual prefill-chunk
-boundary, including short assistant-template suffixes inside a large request. The automatic share learns
-from timings and can choose different CPU/GPU arithmetic on repeated identical inputs. The RTX 2080
-follow-up tested `N=16` to exclude a six-token suffix without disabling sharing on larger tool results.
-The [measured results and tradeoffs](../rtx2080/experiments/iq1m-current/compact.md) cover this one GPU/model profile.
-
 ### IQ1_M / Q2_0 prompt experts on Turing (opt-in)
 
 `STRATA_PF_FUSED_IQ1_M=1`, together with `STRATA_PF_FUSED=1 STRATA_PF_FUSED_SM75=1`, also takes native layers whose

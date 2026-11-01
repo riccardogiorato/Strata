@@ -23,14 +23,16 @@ Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `ru
 - 131,072 context capacity; 32,768 GPU-resident INT8 KV tokens; KV prefetch.
 - MTP spec4 / minimum probability 0.70; routing prior 1.5.
 - 4,096 requested prefill chunk; 2,000 requested expert-cache slots, elastically resized.
-- IQ1_M INT8 fused prefill enabled with compact buffers; prompt chunks under 16 tokens stay on the GPU; FP16 WMMA disabled.
+- IQ1_M INT8 fused prefill enabled with the previous buffer layout; FP16 WMMA disabled.
 - PCIe fraction 0.35; adaptation every step, 80 swaps, decay 0.97.
 - 8 GiB / two-slot RAM session cache; minimum 1,024 tokens and park gain 1,024.
 - One active decode request at a time; waiting requests queue. Cache slots are not parallel decode slots.
 - CPU vision helper, three threads; authenticated API on port 8080; existing LAN access retained.
 - Client-controlled sampling, normal thinking template, output fitted to available context; local loop closure enabled.
 
-The November 1 compact-layout follow-up is enabled for long-context use. Same-day cold 117K prefill measured **873.1 → 880.7 tok/s** (+0.9%); the usual 32K suite measured **889.0 → 918.9** (+3.4%). Both arms passed **20/20 scored coding attempts and 4/4 near-capacity checks**. This is a tradeoff: scored coding decode measured 62.20 → 61.11 tok/s (−1.74%), and short chat/4K throughput was about 2.4% lower. [Full follow-up and evidence](experiments/iq1m-current/compact.md). The [earlier IQ1_M integration](experiments/iq1m-current/README.md) remains a separate historical comparison. `CURRENT.json` records the exact deployed executable and rollback state.
+The November 1 validated update reads a cold 121K prompt at **866.2 tok/s**, versus 850.6 on the same-day previous production control (+1.8%). The usual 32K suite measured 889.2 tok/s, short chat decode 57.1 tok/s, and scored coding decode 62.16 tok/s. Both configurations passed 20/20 coding attempts and 4/4 near-capacity checks. [Full comparison, rejected alternatives and compact evidence](experiments/iq1m-current/README.md). The exact tested executable is installed; its hash and rollback record are in `CURRENT.json`.
+
+The compact-layout / minimum16 follow-up was rolled back at the user’s request after reviewing its mixed performance. The exact pre-experiment binary and profile are restored; the previously validated IQ1_M fusion remains enabled. [Experimental results](experiments/iq1m-current/compact.md) are retained, and `CURRENT.json` records the rollback.
 
 ## What is local and what is upstream
 
@@ -40,13 +42,12 @@ Our enabled changes relative to upstream release `c62d5e3`:
 2. SM75 native-IQ fused-prefill extension, `STRATA_PF_FUSED_SM75_IQ=1`: smaller tiles to fit IQ codebooks in Turing shared memory.
 3. Prefill VRAM loans: defer/release MTP, head and verifier allocations while reading a prompt, then restore them for generation; repeat loans at 8,192 unread tokens and above.
 4. Hot session restore: move restored state into the native RAM cache without recopying its large KV buffers.
-5. IQ1_M/Q2_0 fused-prefill adapter, `STRATA_PF_FUSED_IQ1_M=1`, with `STRATA_PF_FUSED_LEGACY_LAYOUT=0` to use compact fused buffers and the native fused ring. This extends fusion to the three remaining layers in the current mixed weights; activation rounding can change outputs.
-6. Minimum chunk for CPU expert sharing, `STRATA_PREFILL_CPU_SHARE_MIN=16`: keep tiny template suffixes on the GPU, retaining automatic sharing on eligible larger chunks. This removed observed first-logit variation in the diagnostic probes; it does not guarantee deterministic generation for every conversation.
-7. Local repeated-thinking closure (`reasoning_loop_recovery: close`): use upstream detection and budget-closure machinery to resume once within the original output cap. This is a mitigation, not proof that the model's underlying loop cause is fixed.
+5. IQ1_M/Q2_0 fused-prefill adapter, `STRATA_PF_FUSED_IQ1_M=1`, with `STRATA_PF_FUSED_LEGACY_LAYOUT=1` to retain the old buffer allocation. This extends fusion to the three remaining layers in the current mixed weights; activation rounding can change outputs.
+6. Local repeated-thinking closure (`reasoning_loop_recovery: close`): use upstream detection and budget-closure machinery to resume once within the original output cap. This is a mitigation, not proof that the model's underlying loop cause is fixed.
 
-MTP, residency-biased routing, PCIe expert access, native RAM conversation caching, adaptive expert caching, elastic cache allocation, KV prefetch and the general SM75 performance switches are upstream features. Upstream defaults also enable route-tail skipping at rank 7+ and CPU prompt sharing below 1,024 tokens; our local minimum of 16 narrows the latter eligibility. Routing and tail skipping can change outputs.
+MTP, residency-biased routing, PCIe expert access, native RAM conversation caching, adaptive expert caching, elastic cache allocation, KV prefetch and the general SM75 performance switches are upstream features. Upstream defaults also enable route-tail skipping at rank 7+ and CPU prompt sharing below 1,024 tokens. Routing and tail skipping can change outputs.
 
-Disabled: KVA approximate prefill, all-checkpoint persistence, plain-prompt mode, FP16 grouped WMMA and the persistent prefix-page tier. The repaired FP16 implementation is present as opt-in experimental code, but is **not enabled in production**.
+Disabled: KVA approximate prefill, all-checkpoint persistence, plain-prompt mode, the compact all-fused buffer layout, FP16 grouped WMMA and the persistent prefix-page tier. The repaired FP16 implementation is present as opt-in experimental code, but is **not enabled in production**.
 
 ## Experiments without more top-level checkouts
 
@@ -55,8 +56,9 @@ The same Git repository holds these branches:
 - `rtx2080`: current daily-use code and profile.
 - `experiment/persistent-prefix-cache`: oMLX-inspired persistent serialized prefix pages. Cold-restart and evicted-history recovery improved in the recorded experiments; saving remains synchronous and costs time. This is not a full oMLX implementation. See that branch's `docs/PERSISTENT_PREFIX_PAGES.md` and benchmark record.
 - `experiment/iq1m-fused-prefill`: original TensorFold-inspired IQ1_M adapter and PR #4642 history on its older base, preserved unchanged.
-- `experiment/iq1m-current`: completed current-source integration and validation. The initial validated INT8/old-layout configuration was merged into production; the later compact follow-up supersedes its buffer setting. FP16 remains disabled.
-- `experiment/compact-prefill`: completed compact-buffer and CPU-sharing investigation, merged into production with the throughput tradeoffs documented above.
+- `experiment/iq1m-current`: completed current-source integration and validation. The validated INT8/old-layout configuration is now merged into production; FP16 and compact-layout alternatives remain disabled.
+
+- `experiment/compact-prefill`: compact-buffer and minimum16 CPU-sharing investigation. Rolled back from production; code and measurements remain available for research.
 
 Before switching the serving checkout to an experimental branch, stop `strata-serve.service`. Experimental branches retain their tested older base versions; do not apply the production profile blindly. Follow the branch's own build/configuration documentation. Return with `git switch rtx2080` and restart the service. Use separate ignored build outputs; do not overwrite `runtime/bin/strata` for a test.
 

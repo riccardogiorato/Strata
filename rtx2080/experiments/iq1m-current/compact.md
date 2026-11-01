@@ -1,6 +1,6 @@
 # Compact fused-prefill follow-up — November 1
 
-Selected for the long-context production profile after validation. [Compact evidence](compact-results.json).
+**Rolled back at the user’s request.** The previous production binary and profile are restored. This configuration remains experimental on `experiment/compact-prefill`; the measurements below are unchanged. [Compact evidence](compact-results.json).
 
 The earlier single failed edit was not sufficient evidence that compact buffers corrupt the model. Repeating the test exposed numerical variation in the unchanged baseline too. We isolated the observed probe variation to automatic CPU/GPU sharing on a six-token prompt suffix and added an opt-in minimum chunk size for that sharing. This does not establish the cause of every model mistake or guarantee deterministic generation.
 
@@ -63,9 +63,9 @@ The scored suites completed in control / candidate / candidate / control order:
 
 All native/API counters reconcile. Per-task summaries are included in `compact-results.json`. The candidate's scored prefill rate is +6.27%, while decode is -1.74%. The lower total task time includes fewer generated tokens and different tool paths; it is not a pure engine speedup. The lower aggregate continuation-token reuse also reflects different history lengths and paths: both arms hit the cache on every continuation request.
 
-**Decision: select compact buffers plus minimum16 for the user's long-context production profile.** The modest long-prefill gain repeated in isolated edits, the standard suite and near-capacity agent sessions. Both final arms passed all scored checks. This is a tradeoff, not an across-the-board speedup: scored coding decode was 1.74% lower and the short chat/4K probes about 2.4% lower. There is no claim that the small sample proves unchanged general model quality. The 384-slot compact variant remains unselected; FP16 WMMA remains off.
+**Original decision, subsequently reversed:** compact buffers plus minimum16 were briefly selected for the long-context production profile. The modest long-prefill gain repeated in isolated edits, the standard suite and near-capacity agent sessions. Both final arms passed all scored checks. This is a tradeoff, not an across-the-board speedup: scored coding decode was 1.74% lower and the short chat/4K probes about 2.4% lower. There is no claim that the small sample proves unchanged general model quality. The 384-slot compact variant remains unselected; FP16 WMMA remains off.
 
-The exact tested candidate executable is the deployment artifact; `rtx2080/CURRENT.json` records the installation and post-install checks. Only `STRATA_PF_FUSED_LEGACY_LAYOUT=0` and `STRATA_PREFILL_CPU_SHARE_MIN=16` change in the existing profile. Rollback uses the prior profile/CURRENT state at `fcc1adff233f8d31a2ecf18c4d457a7061048721` and the saved executable `runtime/bin/strata-before-compact-20261101`, with the service stopped during restoration. Routing prior 1.5, MTP, 128K capacity, vision, PCIe settings, session caching and the existing loop closure are retained.
+The candidate executable is retained for research. `rtx2080/CURRENT.json` records its historical installation and the completed rollback. Production again uses `STRATA_PF_FUSED_LEGACY_LAYOUT=1` without `STRATA_PREFILL_CPU_SHARE_MIN`. The restored profile comes from `fcc1adff233f8d31a2ecf18c4d457a7061048721` and the saved executable `runtime/bin/strata-before-compact-20261101`, with the service stopped during restoration. The minimum16 native change and its diagnostic test are also restored to the pre-experiment production source; the experimental branch preserves them. Routing prior 1.5, MTP, 128K capacity, vision, PCIe settings, session caching and the existing loop closure are retained.
 
 ## Reproduction and limits
 

@@ -4,9 +4,9 @@ The current production settings are in [`../profile.json`](../profile.json). His
 
 Research branches and completed promotions:
 
-- `experiment/iq1m-current`: [completed IQ1_M / FP16 validation](iq1m-current/README.md). INT8 with the previous buffer layout was promoted November 1: +1.8% paired 121K prefill, 20/20 coding attempts on both arms. FP16 remains disabled; compact buffers were subsequently selected in the follow-up below.
+- `experiment/iq1m-current`: [completed IQ1_M / FP16 validation](iq1m-current/README.md). INT8 with the previous buffer layout was promoted November 1: +1.8% paired 121K prefill, 20/20 coding attempts on both arms. This configuration is the restored production default. FP16 and compact buffers remain disabled.
 
-- `experiment/compact-prefill`: [compact buffers and tiny-chunk CPU-sharing follow-up](iq1m-current/compact.md). Selected November 1 for +0.9% near-capacity and +3.4% 32K prefill; 20/20 coding on both arms, with −1.74% scored decode and about −2.4% short chat/4K in this campaign.
+- `experiment/compact-prefill`: [compact buffers and tiny-chunk CPU-sharing follow-up](iq1m-current/compact.md). Rolled back at the user’s request after mixed performance results; retained as an experiment. The previous binary and profile are restored.
 
 - `experiment/persistent-prefix-cache`: oMLX-inspired serialized prefix pages, measured restart/eviction gains, synchronous save costs; not production.
 - `experiment/iq1m-fused-prefill`: original TensorFold-inspired IQ1_M adapter and upstream PR history on the older base; superseded by the validated integration above.
