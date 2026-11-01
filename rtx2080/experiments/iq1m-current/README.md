@@ -1,5 +1,7 @@
 # IQ1_M prefill on the RTX 2080: final results
 
+**Later November 1 update:** the [compact-layout follow-up](compact.md) supersedes the buffer-layout decision below. Compact buffers plus a 16-token minimum for CPU sharing are now selected in production, with small prefill gains and documented decode/short-prompt tradeoffs. This page retains the original measurements and rejected candidates.
+
 **Completed November 1, 2026. Selected for production: IQ1_M INT8 fusion with the old buffer layout.** Same-day paired 121K prefill improved **850.6 → 866.2 tok/s (+1.8%)**, saving about 2.6 seconds per cold prompt. Both arms passed 20/20 scored coding attempts and 4/4 near-capacity checks. Decode remained approximately unchanged. This is a small additional gain on the already tuned profile.
 
 [Compact measurements and checks](results.json) include every screened candidate, failures, native token/time counters, cache metrics and executable hashes. Raw prompts, replies, credentials and machine assets remain in ignored `runtime/iq1m-20261031/`.
