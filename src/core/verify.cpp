@@ -865,6 +865,15 @@ bool Verifier::init(const WeightTable& wt, const ModelGeometry& g, SessionState&
         err = "verify: the stage's layer range or its hand-off buffers are wrong";
         return false;
     }
+#if !defined(STRATA_USE_HIP)
+    yukon_commit_ = env_on("STRATA_YUKON_COMMIT");
+    if (yukon_commit_ && (lb_ != 0 || le_ != g.n_layers || split_ || ext_stream_ || !slots_.empty() || g_qfuse() ||
+        env_on("STRATA_GDN_SPLIT") || env_on("STRATA_DBG_GDN") ||
+        (std::getenv("STRATA_GDN_COMMIT_SPLIT") && !env_on("STRATA_GDN_COMMIT_SPLIT")) ||
+        (std::getenv("STRATA_COMMIT_BATCH") && !env_on("STRATA_COMMIT_BATCH")))) {
+        err = "Yukon recurrence experiment requires the single-slot, unsplit, batched-commit path"; return false;
+    }
+#endif
     const WeightRef* wo = wt.find("output.weight");
     if (wo == nullptr) { err = "verify: output.weight is missing"; return false; }
     n_vocab_ = wo->ne1;
@@ -1001,6 +1010,7 @@ bool Verifier::init(const WeightTable& wt, const ModelGeometry& g, SessionState&
         xil_ = b.take<uint8_t>(strata::kernels::native_q8_1_il_bytes(max_in, std::max(4, (int) T)));   // 147-verify: 5-8 columns too
         qkv_L_ = b.take<float>(nG * T * C); h_L_ = b.take<float>(nG * T * C);
         gate_L_ = b.take<float>(nG * T * HV); beta_L_ = b.take<float>(nG * T * HV);
+        if (yukon_commit_) yukon_previous_ = b.take<float>(T * (C + 2 * HV));
         z_ = b.take<float>(T * ZV); y_ = b.take<float>(T * ZV); y_dummy_ = b.take<float>(T * ZV);
         qfull_ = b.take<float>(T * NH * 2 * HD); qcur_ = b.take<float>(T * NH * HD);
         kcur_ = b.take<float>(T * NKV * HD); vcur_ = b.take<float>(T * NKV * HD);
@@ -1081,6 +1091,9 @@ bool Verifier::init(const WeightTable& wt, const ModelGeometry& g, SessionState&
     Bump real;
     real.base = (uint8_t*) arena_;
     carve(real);
+    if (yukon_commit_ && cudaMemset(commit_, 0, (2 + max_t_) * sizeof(int32_t)) != cudaSuccess) {
+        err = "Yukon recurrence pending counter initialization"; return false;
+    }
     {
         const int32_t one = 1;
         if (cudaMemcpy(one_, &one, sizeof one, cudaMemcpyHostToDevice) != cudaSuccess) {
@@ -1272,7 +1285,7 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
     auto Rt = [&](int t) { return R_ + (size_t) t * HC * N; };
     const int G = (split_ && T >= 2 && !batch_rec_) ? 2 : 1;   // a batch window is one group
     // Pipelined windows must wait for the host verdict/snapshot fence before mutating state.
-    const bool self_commit = T == 1 && !always_publish_ && !batch_rec_ && !g_qfuse() && one_token_self_commit();   // see Verifier::commit
+    const bool self_commit = !yukon_commit_ && T == 1 && !always_publish_ && !batch_rec_ && !g_qfuse() && one_token_self_commit();   // see Verifier::commit
     static const bool dec_batch = [] { const char* v = std::getenv("STRATA_DEC_BATCH"); return v == nullptr || std::atoi(v) != 0; }();
     // fork 34a35db: the GDN gates and the QSA indexer beside the projections (STRATA_SIDE_MIXER=1; 0 / unset = in line)
     const int side_mixer_mode = g_side_mixer();
@@ -1578,6 +1591,10 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
                 float* hb = h_L_ + (size_t) gi * MT * C;
                 float* gate = gate_L_ + (size_t) gi * MT * HV;
                 float* beta = beta_L_ + (size_t) gi * MT * HV;
+                if (yukon_commit_) {
+                    if (batch_rec_ || G != 1) { err = "Yukon recurrence does not support grouped/batched windows"; return false; }
+                    gdn_save_pending(hb, gate, beta, yukon_previous_, (int) C, (int) HV, (int) MT, commit_, cs);
+                }
                 if (sidem) {   // the gates (a few blocks, latency-bound) beside the projections, joined below
                     if (!branch(mfork_, cs, side_, "fork")) return false;
                     gdn_ab_multi(xm, (const uint16_t*) wa->data, (const uint16_t*) wb->data, (const float*) wdt->data,
@@ -1689,6 +1706,11 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
                                             (int) HK, (int) HV, t - first, keep_rows ? one_ : nullptr, cs, 0);
                     }
                 } else
+                if (yukon_commit_)
+                    gdn_step_norm_deferred(state, yukon_previous_, yukon_previous_ + MT*C,
+                        yukon_previous_ + MT*(C+HV), 0, hb, (int) C, gate, beta, z_, (const float*) wnm->data,
+                        EPS, y_, (int) HK, (int) HV, te, cs, commit_);
+                else
                 gdn_step_norm_multi(state, hb, (int) C, gate, beta, z_, (const float*) wnm->data, EPS, y_, (int) HK,
                                     (int) HV, te, self_commit ? one_ : nullptr, cs, tb, g_qfuse() ? (void*) xq_ : nullptr);
                 stamp(l, 6, grp);
@@ -2426,6 +2448,7 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
         return true;
     }
 
+    const bool yukon_head = yukon_head_for(T);
     // ---- the head, T columns, and the argmax of each
     stamp(g.n_layers, 0, 0);
     {
@@ -2495,6 +2518,22 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
         if (head_ != nullptr && head_->loaded()) {
             try {
                 native_quantize_q8_1(head_mixed_, xq_, (int) N, T, cs);
+#if !defined(STRATA_USE_HIP)
+                if (env_on("STRATA_YUKON_HEAD_LAYOUT") && head_->type() == 23 && (T == 1 || T == 5)) {
+                    if (T >= 2) strata::kernels::native_q8_1_interleave(xq_, xil_, (int) N, T, cs);
+                    strata::kernels::native_iq4_xs_head_layout(head_->weights(), xq_, xil_, head_logits_,
+                        (int) N, (int) n_vocab_, T, 4, cs);
+                } else if (yukon_head) {
+                    if (T >= 2) strata::kernels::native_q8_1_interleave(xq_, xil_, (int) N, T, cs);
+                    // Partial top-1 records fit within the existing logits allocation.
+                    // No extra persistent VRAM; sampled/logprob consumers materialize on demand.
+                    const int rows = 4;
+                    if (!strata::kernels::native_iq4_xs_head_il(head_->weights(), xq_, xil_, head_logits_, m_out_,
+                        nan_guard_on() ? m_nf_ : nullptr, (int) N, (int) n_vocab_, T, rows, cs)) {
+                        err = "Yukon greedy head shape unsupported"; return false;
+                    }
+                } else
+#endif
                 if (g_mmvq_il() && strata::kernels::native_mmvq_il_supported(head_->type(), (int) T, (int) n_vocab_)) {
                     if (T >= 2) strata::kernels::native_q8_1_interleave(xq_, xil_, (int) N, (int) T, cs);
                     strata::kernels::native_mmvq_il(head_->type(), head_->weights(), xq_, xil_, head_logits_, (int) N,
@@ -2509,16 +2548,16 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
         // Greedy, the default, is recorded here as before (no extra launch or sync per window). A request that
         // samples or penalizes is sampled again host-side after the replay (run()) with its own parameters and a
         // fresh draw counter: a captured sampler would bake them in and replay the same draws forever.
-        if (argmax_rows_wanted()) {   // sm_80 to sm_89 (sm_7x opt-in): the pick over many blocks a row (bitwise the one-block kernel's)
+        if (!yukon_head && argmax_rows_wanted()) {   // sm_80 to sm_89 (sm_7x opt-in): the pick over many blocks a row (bitwise the one-block kernel's)
             argmax_rows(head_logits_, T, (int) n_vocab_, arg_scratch_, m_out_, cs);
-        } else {
+        } else if (!yukon_head) {
             SamplerParams sp;
             sp.greedy = true;
             sp.temperature = 0.0f;
             sample_tokens(head_logits_, T, (int) n_vocab_, nullptr, 0, sp, m_out_, cs);
         }
         // #879: whether each row's logits are all finite, beside the pick (read after the window's own sync)
-        if (nan_guard_on()) strata::kernels::logits_nonfinite_rows(head_logits_, T, (int) n_vocab_, m_nf_, cs);
+        if (!yukon_head && nan_guard_on()) strata::kernels::logits_nonfinite_rows(head_logits_, T, (int) n_vocab_, m_nf_, cs);
     }
     stamp(g.n_layers, 1, 0);
     if (tap_on_ && !batch_rec_ && tap_file_ != nullptr) copy_from_mapped(m_tap_, tap_dev_, (int64_t) T * (int64_t) tap_layers_.size() * N, cs);
@@ -2825,7 +2864,7 @@ bool Verifier::capture_commit(std::string& err) {
                     (int64_t) g.ssm_state_size * g.ssm_v_heads * g.ssm_state_size, qkv_L_ + (size_t) gdn_index * MT * C,
                     MT * C, h_L_ + (size_t) gdn_index * MT * C, MT * C, gate_L_ + (size_t) gdn_index * MT * HV,
                     beta_L_ + (size_t) gdn_index * MT * HV, MT * HV, (int) C, (int) g.ssm_k_heads, (int) HV, (int) MT,
-                    (int) n_gdn, commit_, cs_);
+                    (int) n_gdn, commit_, cs_, yukon_commit_);
         }
         // the QSA layers' tail restore + indexer append, one launch for all of them (one block per layer)
         bool qsa_batched = false;
@@ -2938,6 +2977,7 @@ void Verifier::stage_inputs(int T, const int32_t* tokens, int64_t pos0) {
     std::atomic_thread_fence(std::memory_order_seq_cst);
     strata_store_fence();
     last_t_ = T;
+    yukon_logits_ready_ = !yukon_head_for(T);
     if (rs_on_ && T >= 1 && T <= 8) ++rs_win_[T];
     last_pos0_ = pos0;
     for (int t = 0; t < T; ++t) last_tokens_[t] = tokens[t];
@@ -3384,6 +3424,10 @@ bool Verifier::run(int T, const int32_t* tokens, int64_t pos0, PoolMultiFn pool,
         return false;
     }
     commit_pending_ = false;
+    if (yukon_commit_) {
+        yukon_pending_ = false; // the replay folded the previous accepted prefix
+        cudaMemsetAsync(commit_, 0, sizeof(int32_t), cs_);
+    }
     progress_at("verify window: waiting for the expert copies", (int64_t) T);
     if (copy_used_) {
         cudaStreamSynchronize(copy_);   // no host function of this window may raise flag B in the next one
@@ -3401,6 +3445,7 @@ bool Verifier::run(int T, const int32_t* tokens, int64_t pos0, PoolMultiFn pool,
     }
     const bool sampled = !sampling_.greedy && sampling_.temperature > 0.0f;
     if (head_sampling_ && (sampled || hist_d_ != nullptr || sampling_.logit_bias != nullptr)) {
+        if (!materialize_yukon_logits(err)) return false;
         SamplerParams sp = sampling_;
         sp.counter = (uint64_t) pos0;
         // STRATA_SPEC_PROB: the drafter's q lists for this window, judged by rejection sampling (spec_prob.hpp)
@@ -3590,6 +3635,7 @@ bool Verifier::window_logprobs(const int32_t* targets, int T, int64_t pos0, int3
                                std::string& err) {
     if (next_ != nullptr) return next_->window_logprobs(targets, T, pos0, extra_id, out, err);
     const OnDevice on_device(device_);
+    if (!materialize_yukon_logits(err)) return false;
 #if defined(STRATA_GPU_METAL)
     // the head logits are the Metal window's (window_copy_logits, row by row)
     if (n_vocab_ <= 0 || T <= 0 || targets == nullptr || out == nullptr) {
@@ -3669,7 +3715,7 @@ bool Verifier::commit(int n_keep, std::string& err) {
     h_commit_[0] = n_keep;
     h_commit_[1] = n_keep - 1;
     for (int t = 0; t < max_t_; ++t) h_commit_[2 + t] = t < n_keep ? (int32_t) (last_pos0_ + t) : -1;
-    if (last_t_ == 1 && !always_publish_ && one_token_self_commit() && !g_qfuse()) {
+    if (!yukon_commit_ && last_t_ == 1 && !always_publish_ && one_token_self_commit() && !g_qfuse()) {
         // a one-token window has advanced the state itself (record_window): no commit graph. (Not with STRATA_QFUSE: its windows
         // do not self-commit, see `self_commit` there - skipping the commit here left the GDN state and the indexer tail one token behind.)
     } else {
@@ -3710,6 +3756,7 @@ bool Verifier::commit(int n_keep, std::string& err) {
             commit_pending_ = true;
         }
     }
+    if (yukon_commit_) yukon_pending_ = true;
     if (ple_stage())   // stages that share one session must advance it once
         for (int t = 0; t < n_keep; ++t) {
             ss_->ple_prev[0] = ss_->ple_prev[1];
@@ -3729,6 +3776,19 @@ bool Verifier::wait_commit(std::string& err) {
         commit_pending_ = false;
         const cudaError_t se = cudaEventSynchronize(commit_done_);
         if (se != cudaSuccess) { err = std::string("verify: commit: ") + cudaGetErrorString(se); return false; }
+    }
+    if (yukon_commit_ && yukon_pending_) {
+        const OnDevice on_device(device_);
+        const auto& g = *g_;
+        const int64_t state_stride = g.ssm_state_size * g.ssm_v_heads * g.ssm_state_size +
+                                     (g.ssm_d_conv - 1) * g.ssm_conv_channels;
+        strata::kernels::gdn_flush_pending(ss_->gdn_state, state_stride, h_L_, max_t_ * g.ssm_conv_channels,
+            gate_L_, beta_L_, max_t_ * g.ssm_v_heads, (int) g.ssm_conv_channels, (int) g.ssm_k_heads,
+            (int) g.ssm_v_heads, (int) g.n_gdn_layers(), commit_, cs_);
+        cudaMemsetAsync(commit_, 0, sizeof(int32_t), cs_);
+        const auto e = cudaStreamSynchronize(cs_);
+        if (e != cudaSuccess) { err = std::string("Yukon recurrence flush: ") + cudaGetErrorString(e); return false; }
+        yukon_pending_ = false;
     }
     return next_ == nullptr || next_->wait_commit(err);
 }
@@ -4795,9 +4855,10 @@ void Verifier::note_nonfinite(int T, const int64_t* pos_b) {
     nf_mask_ = 0;
     if (!nan_guard_on() || h_nf_ == nullptr || !last_stage()) return;   // (a stage without the head checks nothing)
     const volatile uint32_t* f = h_nf_;
+    const int flag_stride = yukon_head_for(T) ? 1 : strata::kernels::kNonfiniteBlocks;
     for (int t = 0; t < T && t < strata::kernels::kVerifyMaxT; ++t)
-        for (int b = 0; b < strata::kernels::kNonfiniteBlocks; ++b)
-            if (f[t * strata::kernels::kNonfiniteBlocks + b] != 0) { nf_mask_ |= 1u << t; break; }
+        for (int b = 0; b < flag_stride; ++b)
+            if (f[t * flag_stride + b] != 0) { nf_mask_ |= 1u << t; break; }
     const std::vector<long long>& inject = nan_inject_list();
     if (!inject.empty()) {
         const long long k = g_nf_windows.fetch_add(1) + 1;
@@ -4811,12 +4872,42 @@ void Verifier::note_nonfinite(int T, const int64_t* pos_b) {
     if (nf_row_ >= 0) nf_pos_ = pos_b != nullptr ? pos_b[nf_row_] : last_pos0_ + nf_row_;
 }
 
+bool Verifier::yukon_head_for(int T) const {
+#if defined(STRATA_USE_HIP) || defined(STRATA_GPU_METAL)
+    return false;
+#else
+    static const bool on = env_on("STRATA_YUKON_HEAD");
+    return on && !env_on("STRATA_YUKON_HEAD_LAYOUT") && (T == 1 || T == 5) && n_vocab_ % 16 == 0 && head_ && head_->loaded() && head_->type() == 23 &&
+           g_ && g_->n_embd % 256 == 0 && lb_ == 0 && le_ == g_->n_layers && !next_ &&
+           !split_ && !ext_stream_ && slots_.empty() && !batch_rec_;
+#endif
+}
+
+bool Verifier::materialize_yukon_logits(std::string& err) const {
+    if (yukon_logits_ready_) return true;
+    const OnDevice on_device(device_);
+    try {
+        const int N = (int) g_->n_embd, T = last_t_;
+        strata::kernels::native_quantize_q8_1(head_mixed_, xq_, N, T, cs_);
+        if (g_mmvq_il() && strata::kernels::native_mmvq_il_supported(head_->type(), T, (int) n_vocab_)) {
+            if (T >= 2) strata::kernels::native_q8_1_interleave(xq_, xil_, N, T, cs_);
+            strata::kernels::native_mmvq_il(head_->type(), head_->weights(), xq_, xil_, head_logits_, N, (int) n_vocab_, T, cs_);
+        } else strata::kernels::native_mmvq(head_->type(), head_->weights(), xq_, head_logits_, N, (int) n_vocab_, T, cs_);
+        const auto e = cudaStreamSynchronize(cs_);
+        if (e != cudaSuccess) { err = std::string("Yukon full-logit fallback: ") + cudaGetErrorString(e); return false; }
+        yukon_logits_ready_ = true;
+        return true;
+    } catch (const std::exception& e) { err = std::string("Yukon full-logit fallback: ") + e.what(); return false; }
+}
+
 bool Verifier::copy_logits(int t, float* host) const {
 #if defined(STRATA_GPU_METAL)
     return strata::metal_engine::window_copy_logits(metal_, t, host);
 #endif
     if (next_ != nullptr) return next_->copy_logits(t, host);   // a layer split: the head is on the last stage
     if (head_logits_ == nullptr || host == nullptr || t < 0 || n_vocab_ <= 0) return false;
+    std::string err;
+    if (!materialize_yukon_logits(err)) return false;
     return cudaMemcpy(host, head_logits_ + (size_t) t * (size_t) n_vocab_, (size_t) n_vocab_ * sizeof(float),
                       cudaMemcpyDeviceToHost) == cudaSuccess;
 }

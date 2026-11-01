@@ -2733,6 +2733,23 @@ bool bf16_proj(Gemm& gm, const core::WeightRef* w, const uint16_t* X, float* Y, 
     return true;
 }
 
+// Yukon shared-input projection experiment. The pack stores alpha and beta in
+// adjacent row-major BF16 matrices. Treat those rows as one matrix so each
+// activation conversion and GEMM serves both projections. No extra VRAM copy.
+// Other pack layouts and requantized tensors retain the existing path.
+bool bf16_proj_adjacent_pair(Gemm& gm, const core::WeightRef* a, const core::WeightRef* b,
+                            const uint16_t* X, const uint16_t* X_lo, float* Y, int64_t T) {
+    static const bool on = [] { const char* v = std::getenv("STRATA_YUKON_PROJECTIONS"); return v && v[0] == '1'; }();
+    if (!on || a->kind != core::WeightKind::Bf16InF32 || b->kind != core::WeightKind::Bf16InF32 ||
+        !a->data || !b->data || a->q8_scale || b->q8_scale || a->ne0 != b->ne0 || a->ne1 != b->ne1 ||
+        (const uint16_t*) a->data + a->ne0 * a->ne1 != (const uint16_t*) b->data) return false;
+    static const bool reported = [] { std::fprintf(stderr, "Yukon: adjacent alpha/beta prefill GEMM active\n"); return true; }();
+    (void) reported;
+    gm.bf16(X, (const uint16_t*) a->data, Y, T, 2 * a->ne1, a->ne0);
+    if (X_lo) gm.bf16(X_lo, (const uint16_t*) a->data, Y, T, 2 * a->ne1, a->ne0, 0, 1.0f);
+    return true;
+}
+
 }  // namespace
 
 namespace {
@@ -3817,8 +3834,10 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
                     }();
                     if ((!kva_state_only || kva_gdn_norm) &&
                         !native_proj(m.gemm, wg, m.mixed_h, m.z, T, v.name("attn_gate.weight"), err)) return false;
-                    if (!bf16_proj(m.gemm, wa, m.mixed_bf, m.ab, T, v.name("ssm_alpha.weight"), err, 2 * HV, m.mixed_bf_lo)) return false;
-                    if (!bf16_proj(m.gemm, wb, m.mixed_bf, m.ab + HV, T, v.name("ssm_beta.weight"), err, 2 * HV, m.mixed_bf_lo)) return false;
+                    if (!bf16_proj_adjacent_pair(m.gemm, wa, wb, m.mixed_bf, m.mixed_bf_lo, m.ab, T)) {
+                        if (!bf16_proj(m.gemm, wa, m.mixed_bf, m.ab, T, v.name("ssm_alpha.weight"), err, 2 * HV, m.mixed_bf_lo)) return false;
+                        if (!bf16_proj(m.gemm, wb, m.mixed_bf, m.ab + HV, T, v.name("ssm_beta.weight"), err, 2 * HV, m.mixed_bf_lo)) return false;
+                    }
                     pt.mark(kPfGdnConv, cs);   // "gdn" is the projections in; the rest on their own lines
                     gdn_gates(m.ab, (const float*) wdt->data, (const float*) wsa->data, m.gate, m.beta, T, m.cs);
                     const int64_t ld_y = pf_pad() && T >= std::max<int64_t>(pf_switch_min_t(), 64) ? ZV + ZV_PAD : 0;

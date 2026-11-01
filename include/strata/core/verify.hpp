@@ -676,6 +676,11 @@ private:
     uint32_t cur_layer_ = 0;
     static void publish_plan(void* ctx);
     void set_plan_slot(int grp);
+    bool yukon_head_for(int T) const;
+    bool materialize_yukon_logits(std::string& err) const;
+    mutable bool yukon_logits_ready_ = true;
+    bool yukon_commit_ = false, yukon_pending_ = false;
+    float* yukon_previous_ = nullptr; // one layer's accepted recurrence inputs, reused along the stream
     bool split_ = false;   // opt-in (--spec-split): exact but slower, see the overlap study
     std::function<bool(cudaStream_t, std::string&)> pre_launch_;   // set_pre_launch
     int groups_[strata::kernels::kWindowMaxT + 1] = {};

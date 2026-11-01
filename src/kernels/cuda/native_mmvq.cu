@@ -1239,11 +1239,14 @@ static bool s26_tsum_on() {
 
 // S26 STRATA_LFUSE (PAIR): blocks n_out.. compute the same rows of w2 into y2 (two matrices of one shape on one
 // input in one launch; each output's code is the single matrix's)
-template<typename F, int NCOLS, int NW, int ROWS, bool TS = false, bool PAIR = false>
+struct YukonHeadPartial { float value; int id; unsigned nonfinite; unsigned pad; };
+
+template<typename F, int NCOLS, int NW, int ROWS, bool TS = false, bool PAIR = false, bool TOP1 = false>
 __launch_bounds__(NW * WARP, (ROWS <= 2 ? 4 : 1))
 __global__ void native_mmvq_multi_kernel(const typename F::Block* __restrict__ w, const Q81Block* x_, float* y_,
                                          int n_in, int n_out,
-                                         const typename F::Block* __restrict__ w2 = nullptr, float* __restrict__ y2 = nullptr) {
+                                         const typename F::Block* __restrict__ w2 = nullptr, float* __restrict__ y2 = nullptr,
+                                         float* full_logits = nullptr) {
     const Q81Block* STRATA_PDL_RESTRICT x = x_;   // __restrict__ below sm_70 only (pdl.hpp, #1469)
     float* STRATA_PDL_RESTRICT y = y_;
     constexpr int BPI = F::BPI * NW / WARPS;           // blocks per iteration scale with the warp count
@@ -1326,13 +1329,22 @@ __global__ void native_mmvq_multi_kernel(const typename F::Block* __restrict__ w
     }
 #pragma unroll
     for (int j = 0; j < NCOLS; ++j) {
+        [[maybe_unused]] float best = -INFINITY; [[maybe_unused]] int id = 0; [[maybe_unused]] unsigned nf = 0;
 #pragma unroll
         for (int i = 0; i < ROWS; ++i) {
 #pragma unroll
             for (int l = 0; l < NW - 1; ++l) tmp[j][i] += partial[l][j][i][threadIdx.x];
             tmp[j][i] = warp_sum(tmp[j][i]);
-            if (threadIdx.x == i && row0 + i < n_out) y[std::size_t(j) * n_out + row0 + i] = tmp[j][i];
+            if constexpr (TOP1) {
+                if (row0 + i < n_out) {
+                    const float v = tmp[j][i]; nf |= !isfinite(v);
+                    if (v > best) { best = v; id = row0 + i; }
+                    if (full_logits && threadIdx.x == i) full_logits[std::size_t(j) * n_out + row0 + i] = v;
+                }
+            } else if (threadIdx.x == i && row0 + i < n_out) y[std::size_t(j) * n_out + row0 + i] = tmp[j][i];
         }
+        if constexpr (TOP1) if (threadIdx.x == 0)
+            reinterpret_cast<YukonHeadPartial*>(y)[j * gridDim.x + blockIdx.x] = {best, id, nf, 0};
     }
 }
 
@@ -1551,7 +1563,7 @@ void launch_multi_n(const void* weights, const void* x_q8_1, float* y, int n_in,
         constexpr int NW = NCOLS <= 4 ? 4 : 2;
         const unsigned blocks = unsigned((std::size_t(n_out) + 1) / 2);
         launch_pdl(native_mmvq_multi_kernel<F, NCOLS, NW, 2, false, false>, dim3(blocks), dim3(WARP, NW), 0, s, w, x, y, n_in, n_out,
-                   (const typename F::Block*) nullptr, (float*) nullptr);
+                   (const typename F::Block*) nullptr, (float*) nullptr, (float*) nullptr);
         return;
     }
     const dim3 threads(WARP, WARPS);
@@ -1565,14 +1577,14 @@ void launch_multi_n(const void* weights, const void* x_q8_1, float* y, int n_in,
         return v != nullptr && v[0] != '\0' && v[0] != '0';
     }();
     if ((rows1 || q8_0_rows1<F>(n_in, n_out)) && n_in / F::DIV >= F::BPI) {
-        if (s26_tsum_on()) launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, 1, true, false>, dim3(unsigned(n_out)), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2);
-        else launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, 1, false, false>, dim3(unsigned(n_out)), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2);
+        if (s26_tsum_on()) launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, 1, true, false>, dim3(unsigned(n_out)), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2, (float*) nullptr);
+        else launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, 1, false, false>, dim3(unsigned(n_out)), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2, (float*) nullptr);
         return;
     }
     constexpr int ROWS = 2;
     const unsigned blocks = unsigned((std::size_t(n_out) + ROWS - 1) / ROWS);
-    if (s26_tsum_on()) launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, ROWS, true, false>, dim3(blocks), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2);
-    else launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, ROWS, false, false>, dim3(blocks), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2);
+    if (s26_tsum_on()) launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, ROWS, true, false>, dim3(blocks), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2, (float*) nullptr);
+    else launch_pdl(native_mmvq_multi_kernel<F, NCOLS, WARPS, ROWS, false, false>, dim3(blocks), threads, 0, s, w, x, y, n_in, n_out, no_w2, no_y2, (float*) nullptr);
 }
 
 template<typename F>
@@ -2202,6 +2214,85 @@ __global__ void native_mmvq_il_kernel(const typename I::F::Block* __restrict__ w
                 if (lane == 0 && row0 + i < n_out) y[std::size_t(c) * n_out + row0 + i] = s;
             }
     }
+}
+
+// Exact interleaved head variant: keep the tuned per-warp dot layout.
+template <typename I, int NC, int R>
+__launch_bounds__(4 * WARP)
+__global__ void yukon_head_il_kernel(const typename I::F::Block* __restrict__ w, const int* __restrict__ xq,
+                                      const float* __restrict__ xd, float* __restrict__ y, int n_in, int n_out, float* full_logits) {
+    using F = typename I::F;
+    constexpr int SUB = WARP / F::T;   // weight blocks a chunk covers
+    const int lane = int(threadIdx.x) & (WARP - 1);
+    const auto x = q8_1_cols<NC, I::PM>(xq, xd, n_in / Q8K);
+    __shared__ YukonHeadPartial partial[4][NC];
+    YukonHeadPartial best[NC];
+#pragma unroll
+    for (int c = 0; c < NC; ++c) best[c] = {-INFINITY, 0, 0, 0};
+    const int bpr = n_in / F::DIV;
+    const int kqs = F::kqs(lane);
+    const int nm = (bpr + SUB - 1) / SUB;
+    // A grid-stride loop over the row groups, though the grid gives each warp one: without it ptxas gives several
+    // instances fewer registers (the fork measured Q6_K's at 3 columns 10-50% slower).
+    for (int grp = int(blockIdx.x) * 4 + (int(threadIdx.x) >> 5); grp * R < n_out; grp += int(gridDim.x) * 4) {
+        const int row0 = grp * R;
+        float acc[4][R][NC];
+#pragma unroll
+        for (int v = 0; v < 4; ++v)
+#pragma unroll
+            for (int i = 0; i < R; ++i)
+#pragma unroll
+                for (int c = 0; c < NC; ++c) acc[v][i][c] = 0.0f;
+        for (int m0 = 0; m0 < nm; m0 += 4) {
+#pragma unroll
+            for (int v = 0; v < 4; ++v) {
+                const int kbx = SUB * (m0 + v) + lane / F::T;
+                if (kbx < bpr) {
+#pragma unroll
+                    for (int i = 0; i < R; ++i) {
+                        const int row = min(row0 + i, n_out - 1);   // a partial last group recomputes its last row
+                        const typename F::W wv = F::load(w + std::size_t(row) * bpr + kbx, kqs);
+                        float o[NC];
+                        I::template apply<NC>(wv, x, kbx * F::KBY, kqs, o);
+#pragma unroll
+                        for (int c = 0; c < NC; ++c) acc[v][i][c] += o[c];
+                    }
+                }
+            }
+        }
+#pragma unroll
+        for (int i = 0; i < R; ++i)
+#pragma unroll
+            for (int c = 0; c < NC; ++c) {
+                float s = acc[0][i][c];
+                s += acc[1][i][c];
+                s += acc[2][i][c];
+                s += acc[3][i][c];
+                s = warp_sum(s);
+                if (row0 + i < n_out) {
+                    best[c].nonfinite |= !isfinite(s);
+                    if (s > best[c].value) { best[c].value = s; best[c].id = row0 + i; }
+                    if (full_logits && lane == 0) full_logits[std::size_t(c) * n_out + row0 + i] = s;
+                }
+            }
+    }
+    if (lane == 0) {
+#pragma unroll
+        for (int c = 0; c < NC; ++c) partial[threadIdx.x >> 5][c] = best[c];
+    }
+    __syncthreads();
+    if (threadIdx.x < NC) {
+        const int c = threadIdx.x; auto top = partial[0][c];
+#pragma unroll
+        for (int i = 1; i < 4; ++i) {
+            const auto val = partial[i][c]; top.nonfinite |= val.nonfinite;
+            if (val.value > top.value || (val.value == top.value && val.id < top.id)) {
+                top.value = val.value; top.id = val.id;
+            }
+        }
+        reinterpret_cast<YukonHeadPartial*>(y)[c * gridDim.x + blockIdx.x] = top;
+    }
+
 }
 
 int g_il_pf = -1;   // native_mmvq_il_pf (tests, benchmarks): the variant for every launch; -1: STRATA_MMVQ_IL_PF
@@ -3414,6 +3505,46 @@ void native_q6_k_f32(const void* weights, const float* x, void* scratch_q8_1,
     native_q6_k_mmvq(weights, scratch_q8_1, y, n_in, n_out, ncols, stream);
 }
 
+// Experimental exact greedy output head, all vocabulary rows retained. A block
+// emits one top-1 pair instead of all logits; the merge retains lowest-ID ties.
+__global__ void yukon_head_merge(const YukonHeadPartial* p, int tiles, int32_t* ids, uint32_t* flags) {
+    __shared__ YukonHeadPartial shared[256];
+    const int t = blockIdx.x, lane = threadIdx.x;
+    YukonHeadPartial best{-INFINITY, 0, 0, 0};
+    for (int i = lane; i < tiles; i += blockDim.x) {
+        const auto x = p[t * tiles + i]; best.nonfinite |= x.nonfinite;
+        if (x.value > best.value || (x.value == best.value && x.id < best.id)) { best.value = x.value; best.id = x.id; }
+    }
+    shared[lane] = best; __syncthreads();
+    for (int gap = 128; gap; gap /= 2) {
+        if (lane < gap) {
+            const auto x = shared[lane + gap]; auto& v = shared[lane]; v.nonfinite |= x.nonfinite;
+            if (x.value > v.value || (x.value == v.value && x.id < v.id)) { v.value = x.value; v.id = x.id; }
+        }
+        __syncthreads();
+    }
+    if (!lane) { ids[t] = shared[0].id; if (flags) flags[t] = shared[0].nonfinite; }
+}
+
+template<int NC, int ROWS> void yukon_head_launch(const void* w, const void* x, void* tmp, int32_t* ids,
+                                                uint32_t* flags, int ni, int no, cudaStream_t s, float* logits) {
+    const int tiles = (no + ROWS - 1) / ROWS;
+    native_mmvq_multi_kernel<IQ4XSTraits, NC, WARPS, ROWS, false, false, true>
+        <<<tiles, dim3(WARP, WARPS), 0, s>>>(static_cast<const IQ4XSBlock*>(w), static_cast<const Q81Block*>(x),
+           static_cast<float*>(tmp), ni, no, nullptr, nullptr, logits);
+    yukon_head_merge<<<NC, 256, 0, s>>>(static_cast<const YukonHeadPartial*>(tmp), tiles, ids, flags);
+}
+void native_iq4_xs_head(const void* w, const void* x, void* tmp, int32_t* ids, uint32_t* flags,
+                        int ni, int no, int nc, int rows, void* stream, float* logits) {
+    if (ni <= 0 || ni % 256 || no <= 0 || nc < 1 || nc > 5 || (rows != 2 && rows != 4 && rows != 8))
+        throw std::invalid_argument("Yukon head shape");
+    const auto s = static_cast<cudaStream_t>(stream);
+#define YH(N) case N: if(rows == 2) yukon_head_launch<N,2>(w,x,tmp,ids,flags,ni,no,s,logits); else if(rows == 4) yukon_head_launch<N,4>(w,x,tmp,ids,flags,ni,no,s,logits); else yukon_head_launch<N,8>(w,x,tmp,ids,flags,ni,no,s,logits); break;
+    switch(nc) { YH(1) YH(2) YH(3) YH(4) YH(5) }
+#undef YH
+    launch_check();
+}
+
 void native_q4_0_mmvq(const void* weights, const void* x_q8_1, float* y,
                        int n_in, int n_out, int ncols, void* stream) {
     small_mmvq<Q40Block, 4>(weights, x_q8_1, y, n_in, n_out, ncols, stream);
@@ -3954,6 +4085,35 @@ void native_mmvq_il(int ggml_type, const void* weights, const void* x_q8_1, cons
     case 14: launch_il_rows<IlQ6K>(r, weights, x_il, y, n_in, n_out, ncols, s); break;
     case 11: launch_il_rows<IlQ3K>(r, weights, x_il, y, n_in, n_out, ncols, s); break;
     }
+    launch_check();
+}
+
+template<int NC, int R> void yukon_head_il_launch(const void* w, const void* xq, const void* xil, void* tmp,
+    int32_t* ids, uint32_t* flags, int ni, int no, cudaStream_t stream, float* logits) {
+    const int tiles = (no + 4 * R - 1) / (4 * R);
+    const int* q = static_cast<const int*>(xq); const float* d = nullptr;
+    if constexpr (NC > 1) { const auto p = q8_1_il_parts(xil, ni, NC); q = p.pm; d = p.d; }
+    yukon_head_il_kernel<IlIQ4XS, NC, R><<<tiles, 4 * WARP, 0, stream>>>(
+        static_cast<const IQ4XSBlock*>(w), q, d, static_cast<float*>(tmp), ni, no, logits);
+    yukon_head_merge<<<NC, 256, 0, stream>>>(static_cast<const YukonHeadPartial*>(tmp), tiles, ids, flags);
+}
+bool native_iq4_xs_head_il(const void* w, const void* xq, const void* xil, void* tmp, int32_t* ids,
+    uint32_t* flags, int ni, int no, int nc, int rows, void* stream, float* logits) {
+    if (ni <= 0 || ni % 256 || no <= 0 || nc < 1 || nc > 5 || (rows != 1 && rows != 2 && rows != 4)) return false;
+    const auto st = static_cast<cudaStream_t>(stream);
+#define YHI(N) case N: if(rows==1) yukon_head_il_launch<N,1>(w,xq,xil,tmp,ids,flags,ni,no,st,logits); else if(rows==2) yukon_head_il_launch<N,2>(w,xq,xil,tmp,ids,flags,ni,no,st,logits); else yukon_head_il_launch<N,4>(w,xq,xil,tmp,ids,flags,ni,no,st,logits); break;
+    switch(nc) { YHI(1) YHI(2) YHI(3) YHI(4) YHI(5) }
+#undef YHI
+    launch_check(); return true;
+}
+
+void native_iq4_xs_head_layout(const void* w, const void* xq, const void* xil, float* logits,
+                              int ni, int no, int nc, int rows, void* stream) {
+    if (nc == 5 && rows == 4) {
+        const auto p = q8_1_il_parts(xil, ni, nc);
+        native_mmvq_il_kernel<IlIQ4XS, 5, 4><<<(no+15)/16,4*WARP,0,static_cast<cudaStream_t>(stream)>>>(
+            static_cast<const IQ4XSBlock*>(w),p.pm,p.d,logits,ni,no);
+    } else launch_il_rows<IlIQ4XS>(rows, w, nc == 1 ? xq : xil, logits, ni, no, nc, static_cast<cudaStream_t>(stream));
     launch_check();
 }
 

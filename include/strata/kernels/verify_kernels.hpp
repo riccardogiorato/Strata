@@ -31,6 +31,14 @@ void gdn_conv_l2_multi(const float* history, const float* qkv, const float* conv
                        int qk_heads, float eps, int n_tok, void* stream, int t_begin = 0, bool commit = false);
 /// history <- the last 3 entries of [history | qkv_0 .. qkv_{n-1}], n = *n_keep (0 leaves it as it was).
 void gdn_conv_commit(float* history, const float* qkv, int channels, const int32_t* n_keep, void* stream);
+/// Experimental cross-round recurrence: apply the accepted prefix of the previous
+/// window, materialize its state, then verify the new window from those registers.
+/// Previous buffers must remain alive and disjoint from the new window's buffers.
+void gdn_step_norm_deferred(float* state, const float* previous_h, const float* previous_gate,
+                            const float* previous_beta, int previous_keep,
+                            const float* h, int channels, const float* gate, const float* beta,
+                            const float* z, const float* gamma, float eps, float* y,
+                            int h_k, int h_v, int n_tok, void* stream, const int32_t* keep_ptr = nullptr);
 /// alpha/beta for T columns of x (T, n_embd): gate (T, h_v), beta (T, h_v).  Bitwise `fused_gdn_ab` per column.
 /// gdn_conv_l2_multi and gdn_ab_multi in one launch (143-amdk)
 void gdn_conv_ab_multi(const float* history, const float* qkv, const float* conv_w, float* h, int channels, int qk_heads,
@@ -67,7 +75,7 @@ void gdn_step_norm_multi(float* state, const float* h, int conv_channels, const 
 /// state-only kernel (STRATA_GDN_SPLIT=1, STRATA_GDN_COMMIT_SPLIT=0, STRATA_DBG_GDN=1): the caller then keeps the loop.
 bool gdn_commit_layers(float* state, int64_t state_stride, int64_t conv_off, const float* qkv, int64_t qkv_stride,
                        const float* h, int64_t h_stride, const float* gate, const float* beta, int64_t gb_stride,
-                       int conv_channels, int h_k, int h_v, int n_max, int n_layers, const int32_t* n_keep, void* stream);
+                       int conv_channels, int h_k, int h_v, int n_max, int n_layers, const int32_t* n_keep, void* stream, bool defer_state = false);
 /// (xq_out, S26 STRATA_QFUSE: also write the q8_1 image of output rows [t_out_begin, n_tok) there - the bytes
 /// native_quantize_q8_1(y + t_out_begin * value_dim, xq_out, value_dim, n_tok - t_out_begin) would write.)
 /// Spin until *flag >= value (a mapped host flag).  The value is fixed at capture, so several rings can be
@@ -203,3 +211,11 @@ void window_ids_floor(int32_t* steps, int n, int window, int32_t* ids, int64_t i
                       void* stream);
 
 }  // namespace strata::kernels
+
+namespace strata::kernels {
+void gdn_save_pending(const float* h, const float* gate, const float* beta, float* scratch,
+                      int channels, int h_v, int max_t, const int32_t* keep, void* stream);
+void gdn_flush_pending(float* state, int64_t state_stride, const float* h, int64_t h_stride,
+                       const float* gate, const float* beta, int64_t gb_stride,
+                       int channels, int h_k, int h_v, int layers, const int32_t* keep, void* stream);
+}

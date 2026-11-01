@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace strata::kernels {
 
@@ -178,3 +179,25 @@ void native_mmvq_il_tune(int rows);
 void native_mmvq_il_pf(int pf);
 
 } // namespace strata::kernels
+
+namespace strata::kernels {
+/// Experimental IQ4_XS head + exact top-1. Scratch bytes: ceil(n_out/rows)*ncols*16.
+/// rows=2/4/8; ncols=1..5. Optional full_logits permits parity checking/fallback consumers.
+void native_iq4_xs_head(const void* weights, const void* x_q8_1, void* scratch,
+                        int32_t* ids, uint32_t* nonfinite, int n_in, int n_out,
+                        int ncols, int rows, void* stream, float* full_logits = nullptr);
+}
+
+namespace strata::kernels {
+/// CUDA interleaved variant; rows=1/2/4 per warp, scratch ceil(n_out/(4*rows))*ncols*16.
+bool native_iq4_xs_head_il(const void* weights, const void* x_q8_1, const void* x_il,
+    void* scratch, int32_t* ids, uint32_t* nonfinite, int n_in, int n_out,
+    int ncols, int rows, void* stream, float* full_logits = nullptr);
+}
+
+namespace strata::kernels {
+/// Experimental control: existing interleaved MMVQ with an explicit head row layout,
+/// still materializing all logits. Separates layout gains from top-1 fusion gains.
+void native_iq4_xs_head_layout(const void* weights, const void* x_q8_1, const void* x_il,
+                              float* logits, int n_in, int n_out, int ncols, int rows, void* stream);
+}
