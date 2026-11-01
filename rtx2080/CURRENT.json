@@ -105,5 +105,9 @@
       "legacy_layout": true,
       "minimum16_absent": true
     }
-  }
+  },
+  "api_model_id": "Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS",
+  "model_family": "Qwen3.8-Flash-Next",
+  "model_publisher": "ukisai",
+  "quantization": "GSQ-RCO IQ2_XS"
 }

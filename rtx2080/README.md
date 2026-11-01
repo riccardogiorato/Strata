@@ -20,6 +20,7 @@ Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `ru
 
 - Strata 0.2.9 / engine 0.1.55, CUDA SM75, RTX 2080 8 GB at 165 W, 64 GB system RAM.
 - Swift 1.5 Qwen3.8 Flash-Next GSQ-RCO IQ2_XS, 125B MoE, NVMe weights.
+- API model ID: `Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS`. Pi uses provider `strata` with this same ID, so T3 usage records identify the model and quant. Older requests using `local-model` remain accepted and receive the canonical model ID in responses. No extra alias is advertised.
 - 131,072 context capacity; 32,768 GPU-resident INT8 KV tokens; KV prefetch.
 - MTP spec4 / minimum probability 0.70; routing prior 1.5.
 - 4,096 requested prefill chunk; 2,000 requested expert-cache slots, elastically resized.
@@ -33,6 +34,15 @@ Edit `rtx2080/profile.json`, then restart the service. Do not edit generated `ru
 The November 1 validated update reads a cold 121K prompt at **866.2 tok/s**, versus 850.6 on the same-day previous production control (+1.8%). The usual 32K suite measured 889.2 tok/s, short chat decode 57.1 tok/s, and scored coding decode 62.16 tok/s. Both configurations passed 20/20 coding attempts and 4/4 near-capacity checks. [Full comparison, rejected alternatives and compact evidence](experiments/iq1m-current/README.md). The exact tested executable is installed; its hash and rollback record are in `CURRENT.json`.
 
 The compact-layout / minimum16 follow-up was rolled back at the user’s request after reviewing its mixed performance. The exact pre-experiment binary and profile are restored; the previously validated IQ1_M fusion remains enabled. [Experimental results](experiments/iq1m-current/compact.md) are retained, and `CURRENT.json` records the rollback.
+
+Pi token accounting uses the final Anthropic usage fields: total prompt tokens are
+`input + cacheWrite + cacheRead`, and total usage adds `output`. Strata classifies
+newly read prompt tokens mostly as cache writes; `input` alone is not the prompt
+size. Cached reads count toward logical context usage, not newly processed prefill.
+The local model has zero API pricing in Pi, while token counts remain recorded.
+T3 prefers the response model name, which is why the serving profile and Pi use
+the same canonical ID. Historical `local-model` usage is left unchanged because
+that alias has served different models.
 
 ## What is local and what is upstream
 

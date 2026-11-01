@@ -47,7 +47,7 @@
   ],
   "cwd": "${REPO}/runtime/assets",
   "tokenizer": "${REPO}/runtime/assets/packs/swift15-iq2xs-gsq/tokenizer",
-  "model_name": "local-model",
+  "model_name": "Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS",
   "log": "${REPO}/runtime/logs/engine.log",
   "host": "0.0.0.0",
   "port": 8080,
