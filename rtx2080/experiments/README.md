@@ -4,6 +4,8 @@ The current production settings are in [`../profile.json`](../profile.json). His
 
 Research branches and completed promotions:
 
+- `experiment/yukon-three-20261101`: [completed Yukon-inspired recurrence, projection and output-head tests](https://github.com/riccardogiorato/Strata/blob/6a84dec06ef1c40e84dc83d46bcb54db4a4ed90b/rtx2080/experiments/yukon-three/README.md). Six 122K edits and eight near-capacity agent checks passed; no consistent overall speed gain. A narrow sampled-prose improvement was retained in the report alongside coding regressions. Research only; production settings and binary unchanged.
+
 - `experiment/iq1m-current`: [completed IQ1_M / FP16 validation](iq1m-current/README.md). INT8 with the previous buffer layout was promoted November 1: +1.8% paired 121K prefill, 20/20 coding attempts on both arms. This configuration is the restored production default. FP16 and compact buffers remain disabled.
 
 - `experiment/compact-prefill`: [compact buffers and tiny-chunk CPU-sharing follow-up](iq1m-current/compact.md). Rolled back at the user’s request after mixed performance results; retained as an experiment. The previous binary and profile are restored.

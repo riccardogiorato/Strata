@@ -54,6 +54,7 @@ Disabled: KVA approximate prefill, all-checkpoint persistence, plain-prompt mode
 The same Git repository holds these branches:
 
 - `rtx2080`: current daily-use code and profile.
+- `experiment/yukon-three-20261101`: [Yukon-inspired kernel experiments and measurements](https://github.com/riccardogiorato/Strata/blob/6a84dec06ef1c40e84dc83d46bcb54db4a4ed90b/rtx2080/experiments/yukon-three/README.md). Tested through 127,990-token agent prompts; retained as research, with no production promotion.
 - `experiment/persistent-prefix-cache`: oMLX-inspired persistent serialized prefix pages. Cold-restart and evicted-history recovery improved in the recorded experiments; saving remains synchronous and costs time. This is not a full oMLX implementation. See that branch's `docs/PERSISTENT_PREFIX_PAGES.md` and benchmark record.
 - `experiment/iq1m-fused-prefill`: original TensorFold-inspired IQ1_M adapter and PR #4642 history on its older base, preserved unchanged.
 - `experiment/iq1m-current`: completed current-source integration and validation. The validated INT8/old-layout configuration is now merged into production; FP16 and compact-layout alternatives remain disabled.
